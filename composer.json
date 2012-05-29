@@ -1,0 +1,20 @@
+{
+  "name": "drupal/composer",
+  "description": "Drush wrapper around the PHP package management, Composer.",
+  "homepage": "http://drupal.org/project/composer",
+  "license": "GPL-2.0",
+  "authors": [
+    {
+      "name": "Rob Loach",
+      "homepage": "http://robloach.net"
+    }
+  ],
+  "support": {
+    "issues": "",
+    "source": ""
+  },
+  "require": {
+    "composer/composer": "*"
+  }
+}
+

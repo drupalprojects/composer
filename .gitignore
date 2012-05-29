@@ -1,0 +1,9 @@
+# Ignore files from Composer that we don't need.
+vendor/.composer
+vendor/bin
+
+# Ignore the .git files so that we don't use git submodules.
+vendor/composer/composer/.git
+vendor/symfony/console/Symfony/Component/Console/.git
+vendor/symfony/finder/Symfony/Component/Finder/.git
+vendor/symfony/process/Symfony/Component/Process/.git

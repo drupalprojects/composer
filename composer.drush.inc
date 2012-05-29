@@ -26,27 +26,27 @@ function composer_drush_command() {
 
 /**
  * Drush Composer; Invokes a Composer command.
+ *
+ * @param $command
+ *   The Composer command we are to execute.
  */
 function drush_composer($command = '') {
-  // Make sure Composer is installed and available. Cache it for a week.
-  $path = drush_directory_cache();
-  $composer = drush_download_file('http://getcomposer.org/composer.phar', $path . '/composer.phar', 604800);
+  // Autoload the required classes.
+  $loader = require_once(__DIR__ . '/vendor/autoload.php');
 
-  // Make sure Composer was loaded corectly.
-  if (drush_file_not_empty($composer)) {
-    // Composer uses argv to retrieve command line arguments, so we emulate the
-    // arguments for Composer.
-    $_SERVER['argv'] = array($composer);
-    foreach (func_get_args() as $arg) {
-      $_SERVER['argv'][] = $arg;
-    }
+  // Composer uses argv to retrieve command line arguments, so we emulate the
+  // arguments for Composer.
+  $_SERVER['argv'] = array($composer);
+  foreach (func_get_args() as $arg) {
+    $_SERVER['argv'][] = $arg;
+  }
 
-    // Invoke Composer to process the command.
-    drush_set_context('DRUSH_EXECUTION_COMPLETED', TRUE);
-    include($composer);
-  }
-  else {
-    // Display an error log about Composer not being loaded.
-    drush_log(dt('Composer was not installed correctly.'), 'error');
-  }
+  // Tell Drush we ran successfully.
+  drush_set_context('DRUSH_EXECUTION_COMPLETED', TRUE);
+
+  // Run the Composer command.
+  $application = new Composer\Console\Application();
+  $application->run();
+
+  return $loader;
 }

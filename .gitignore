@@ -1,6 +1,7 @@
 # Ignore files from Composer that we don't need.
 vendor/.composer
 vendor/bin
+composer.phar
 
 # Ignore the .git files so that we don't use git submodules.
 vendor/composer/composer/.git

@@ -75,3 +75,23 @@ function drush_composer($command = '') {
 
   return $loader;
 }
+
+/**
+ * Implementation of hook_drush_pm_post_download().
+ */
+function composer_drush_pm_post_download($project, $release) {
+  // Check if there's a composer.json to process.
+  $path = isset($project['full_project_path']) ? $project['full_project_path'] : FALSE;
+  if ($path && file_exists($path . '/composer.json')) {
+    // Composer uses the current working directory, so we'll mock it as the
+    // current working directory.
+    $original = getcwd();
+    chdir($path);
+
+    // Run the Composer installation.
+    drush_composer('install');
+
+    // Switch back to the original file path.
+    chdir($original);
+  }
+}

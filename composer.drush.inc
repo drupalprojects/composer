@@ -71,6 +71,7 @@ function drush_composer($command = '') {
 
   // Run the Composer command.
   $application = new Composer\Console\Application();
+  $application->setAutoExit(false);
   $application->run();
 
   return $loader;

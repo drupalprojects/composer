@@ -48,11 +48,21 @@ function drush_composer($command = '') {
   $loader = require_once(__DIR__ . '/vendor/autoload.php');
 
   // Composer uses argv to retrieve command line arguments, so we will emulate
-  // any options passed in.
+  // any options being passed in.
   $options = array();
   foreach ($_SERVER['argv'] as $option) {
     if (substr($option, 0, 2) == '--') {
       $options[] = $option;
+    }
+  }
+
+  // Now that we have all the options, make sure to strip any invalid options
+  // so that Composer still runs correctly.
+  $valid_options = composer_drush_command();
+  $valid_options = array_keys($valid_options['composer']['options']);
+  foreach ($options as $key => $option) {
+    if ($option != '--' . $valid_options) {
+      unset($options[$key]);
     }
   }
 

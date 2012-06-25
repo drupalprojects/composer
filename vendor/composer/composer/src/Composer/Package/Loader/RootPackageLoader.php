@@ -13,6 +13,8 @@
 namespace Composer\Package\Loader;
 
 use Composer\Package\BasePackage;
+use Composer\Config;
+use Composer\Factory;
 use Composer\Package\Version\VersionParser;
 use Composer\Repository\RepositoryManager;
 use Composer\Util\ProcessExecutor;
@@ -27,11 +29,13 @@ use Composer\Util\ProcessExecutor;
 class RootPackageLoader extends ArrayLoader
 {
     private $manager;
+    private $config;
     private $process;
 
-    public function __construct(RepositoryManager $manager, VersionParser $parser = null, ProcessExecutor $process = null)
+    public function __construct(RepositoryManager $manager, Config $config, VersionParser $parser = null, ProcessExecutor $process = null)
     {
         $this->manager = $manager;
+        $this->config = $config;
         $this->process = $process ?: new ProcessExecutor();
         parent::__construct($parser);
     }
@@ -42,20 +46,15 @@ class RootPackageLoader extends ArrayLoader
             $config['name'] = '__root__';
         }
         if (!isset($config['version'])) {
-            $version = '1.0.0';
-
-            // try to fetch current version from git branch
-            if (0 === $this->process->execute('git branch --no-color --no-abbrev -v', $output)) {
-                foreach ($this->process->splitLines($output) as $branch) {
-                    if ($branch && preg_match('{^(?:\* ) *(?:[^/ ]+?/)?(\S+) *[a-f0-9]+ .*$}', $branch, $match)) {
-                        $version = 'dev-'.$match[1];
-                    }
-                }
-            }
-
             // override with env var if available
             if (getenv('COMPOSER_ROOT_VERSION')) {
                 $version = getenv('COMPOSER_ROOT_VERSION');
+            } else {
+                $version = $this->guessVersion($config);
+            }
+
+            if (!$version) {
+                $version = '1.0.0';
             }
 
             $config['version'] = $version;
@@ -84,22 +83,11 @@ class RootPackageLoader extends ArrayLoader
             $package->setMinimumStability(VersionParser::normalizeStability($config['minimum-stability']));
         }
 
-        if (isset($config['repositories'])) {
-            foreach ($config['repositories'] as $index => $repo) {
-                if (isset($repo['packagist']) && $repo['packagist'] === false) {
-                    continue;
-                }
-                if (!is_array($repo)) {
-                    throw new \UnexpectedValueException('Repository '.$index.' should be an array, '.gettype($repo).' given');
-                }
-                if (!isset($repo['type'])) {
-                    throw new \UnexpectedValueException('Repository '.$index.' ('.json_encode($repo).') must have a type defined');
-                }
-                $repository = $this->manager->createRepository($repo['type'], $repo);
-                $this->manager->addRepository($repository);
-            }
-            $package->setRepositories($config['repositories']);
+        $repos = Factory::createDefaultRepositories(null, $this->config, $this->manager);
+        foreach ($repos as $repo) {
+            $this->manager->addRepository($repo);
         }
+        $package->setRepositories($this->config->getRepositories());
 
         return $package;
     }
@@ -161,5 +149,67 @@ class RootPackageLoader extends ArrayLoader
         }
 
         return $references;
+    }
+
+    private function guessVersion(array $config)
+    {
+        // try to fetch current version from git branch
+        if (function_exists('proc_open') && 0 === $this->process->execute('git branch --no-color --no-abbrev -v', $output)) {
+            $branches = array();
+            $isFeatureBranch = false;
+            $version = null;
+
+            foreach ($this->process->splitLines($output) as $branch) {
+                if ($branch && preg_match('{^(?:\* ) *(?:[^/ ]+?/)?(\S+|\(no branch\)) *([a-f0-9]+) .*$}', $branch, $match)) {
+                    if ($match[1] === '(no branch)') {
+                        $version = 'dev-'.$match[2];
+                        $isFeatureBranch = true;
+                    } else {
+                        $version = $this->versionParser->normalizeBranch($match[1]);
+                        $isFeatureBranch = 0 === strpos($version, 'dev-');
+                        if ('9999999-dev' === $version) {
+                            $version = 'dev-'.$match[1];
+                        }
+                    }
+                }
+
+                if ($branch && !preg_match('{^ *[^/]+/HEAD }', $branch)) {
+                    if (preg_match('{^(?:\* )? *(?:[^/ ]+?/)?(\S+) *([a-f0-9]+) .*$}', $branch, $match)) {
+                        $branches[] = $match[1];
+                    }
+                }
+            }
+
+            if (!$isFeatureBranch) {
+                return $version;
+            }
+
+            // ignore feature branches if they have no branch-alias or self.version is used
+            // and find the branch they came from to use as a version instead
+            if ((isset($config['extra']['branch-alias']) && !isset($config['extra']['branch-alias'][$version]))
+                || strpos(json_encode($config), '"self.version"')
+            ) {
+                $branch = preg_replace('{^dev-}', '', $version);
+                $length = PHP_INT_MAX;
+                foreach ($branches as $candidate) {
+                    // do not compare against other feature branches
+                    if ($candidate === $branch || !preg_match('{^(master|trunk|default|develop|\d+\..+)$}', $candidate)) {
+                        continue;
+                    }
+                    if (0 !== $this->process->execute('git rev-list '.$candidate.'..'.$branch, $output)) {
+                        continue;
+                    }
+                    if (strlen($output) < $length) {
+                        $length = strlen($output);
+                        $version = $this->versionParser->normalizeBranch($candidate);
+                        if ('9999999-dev' === $version) {
+                            $version = 'dev-'.$match[1];
+                        }
+                    }
+                }
+            }
+
+            return $version;
+        }
     }
 }

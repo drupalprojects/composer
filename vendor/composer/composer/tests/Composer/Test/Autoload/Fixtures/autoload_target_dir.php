@@ -27,10 +27,10 @@ return call_user_func(function() {
                 continue;
             }
             $path = $dir . implode('/', array_slice(explode('\\', $class), 2)).'.php';
-            if (!stream_resolve_include_path($path)) {
+            if (!$path = stream_resolve_include_path($path)) {
                 return false;
             }
-            require_once $path;
+            require $path;
 
             return true;
         }

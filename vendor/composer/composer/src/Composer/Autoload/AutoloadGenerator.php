@@ -24,7 +24,7 @@ use Composer\Util\Filesystem;
  */
 class AutoloadGenerator
 {
-    public function dump(RepositoryInterface $localRepo, PackageInterface $mainPackage, InstallationManager $installationManager, $targetDir, $bcLinks = false)
+    public function dump(RepositoryInterface $localRepo, PackageInterface $mainPackage, InstallationManager $installationManager, $targetDir)
     {
         $filesystem = new Filesystem();
         $filesystem->ensureDirectoryExists($installationManager->getVendorPath());
@@ -98,10 +98,10 @@ EOF;
                 continue;
             }
             \$path = \$dir . implode('/', array_slice(explode('\\\\', \$class), $levels)).'.php';
-            if (!stream_resolve_include_path(\$path)) {
+            if (!\$path = stream_resolve_include_path(\$path)) {
                 return false;
             }
-            require_once \$path;
+            require \$path;
 
             return true;
         }
@@ -121,27 +121,19 @@ EOF;
         }
         $classmapFile .= ");\n";
 
+        $filesCode = "";
+        $autoloads['files'] = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($autoloads['files']));
+        foreach ($autoloads['files'] as $functionFile) {
+            $filesCode .= '    require __DIR__ . '. var_export('/'.$filesystem->findShortestPath($vendorPath, $functionFile), true).";\n";
+        }
+
         file_put_contents($targetDir.'/autoload_namespaces.php', $namespacesFile);
         file_put_contents($targetDir.'/autoload_classmap.php', $classmapFile);
         if ($includePathFile = $this->getIncludePathsFile($packageMap, $filesystem, $relVendorPath, $vendorPath, $vendorPathCode, $appBaseDirCode)) {
             file_put_contents($targetDir.'/include_paths.php', $includePathFile);
         }
-        file_put_contents($vendorPath.'/autoload.php', $this->getAutoloadFile($vendorPathToTargetDirCode, true, true, (Boolean) $includePathFile, $targetDirLoader));
+        file_put_contents($vendorPath.'/autoload.php', $this->getAutoloadFile($vendorPathToTargetDirCode, true, true, (bool) $includePathFile, $targetDirLoader, $filesCode));
         copy(__DIR__.'/ClassLoader.php', $targetDir.'/ClassLoader.php');
-
-        // TODO BC feature, remove after June 15th
-        if ($bcLinks) {
-            $filesystem->ensureDirectoryExists($vendorPath.'/.composer');
-            $deprecated = "// Deprecated file, use the one in root of vendor dir\n".
-                "trigger_error(__FILE__.' is deprecated, please use vendor/autoload.php or vendor/composer/autoload_* instead'.PHP_EOL.'See https://groups.google.com/forum/#!msg/composer-dev/fWIs3KocwoA/nU3aLko9LhQJ for details', E_USER_DEPRECATED);\n";
-            file_put_contents($vendorPath.'/.composer/autoload_namespaces.php', "<?php\n{$deprecated}\nreturn include dirname(__DIR__).'/composer/autoload_namespaces.php';\n");
-            file_put_contents($vendorPath.'/.composer/autoload_classmap.php', "<?php\n{$deprecated}\nreturn include dirname(__DIR__).'/composer/autoload_classmap.php';\n");
-            file_put_contents($vendorPath.'/.composer/autoload.php', "<?php\n{$deprecated}\nreturn include dirname(__DIR__).'/autoload.php';\n");
-            file_put_contents($vendorPath.'/.composer/ClassLoader.php', "<?php\n{$deprecated}\nreturn include dirname(__DIR__).'/composer/ClassLoader.php';\n");
-            if ($includePathFile) {
-                file_put_contents($vendorPath.'/.composer/include_paths.php', "<?php\n{$deprecated}\nreturn include dirname(__DIR__).'/composer/include_paths.php';\n");
-            }
-        }
     }
 
     public function buildPackageMap(InstallationManager $installationManager, PackageInterface $mainPackage, array $packages)
@@ -173,7 +165,7 @@ EOF;
      */
     public function parseAutoloads(array $packageMap)
     {
-        $autoloads = array('classmap' => array(), 'psr-0' => array());
+        $autoloads = array('classmap' => array(), 'psr-0' => array(), 'files' => array());
         foreach ($packageMap as $item) {
             list($package, $installPath) = $item;
 
@@ -227,7 +219,7 @@ EOF;
         foreach ($packageMap as $item) {
             list($package, $installPath) = $item;
 
-            if (null !== $package->getTargetDir()) {
+            if (null !== $package->getTargetDir() && strlen($package->getTargetDir()) > 0) {
                 $installPath = substr($installPath, 0, -strlen('/'.$package->getTargetDir()));
             }
 
@@ -281,8 +273,12 @@ EOF;
         return $baseDir.var_export($path, true);
     }
 
-    protected function getAutoloadFile($vendorPathToTargetDirCode, $usePSR0, $useClassMap, $useIncludePath, $targetDirLoader)
+    protected function getAutoloadFile($vendorPathToTargetDirCode, $usePSR0, $useClassMap, $useIncludePath, $targetDirLoader, $filesCode)
     {
+        if ($filesCode) {
+            $filesCode = "\n".$filesCode;
+        }
+
         $file = <<<HEADER
 <?php
 
@@ -332,10 +328,10 @@ CLASSMAP;
 
         $file .= $targetDirLoader;
 
-        return $file . <<<'FOOTER'
-    $loader->register();
-
-    return $loader;
+        return $file . <<<FOOTER
+    \$loader->register();
+$filesCode
+    return \$loader;
 });
 
 FOOTER;

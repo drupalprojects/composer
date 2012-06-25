@@ -71,7 +71,7 @@ interface PackageInterface
     /**
      * Returns whether the package is a development virtual package or a concrete one
      *
-     * @return Boolean
+     * @return bool
      */
     public function isDev();
 
@@ -356,4 +356,11 @@ interface PackageInterface
      * @return string
      */
     public function __toString();
+
+    /**
+     * Converts the package into a pretty readable string
+     *
+     * @return string
+     */
+    public function getPrettyString();
 }

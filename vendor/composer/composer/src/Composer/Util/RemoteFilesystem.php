@@ -49,7 +49,7 @@ class RemoteFilesystem
      * @param string  $fileName  the local filename
      * @param boolean $progress  Display the progression
      *
-     * @return Boolean true
+     * @return bool true
      */
     public function copy($originUrl, $fileUrl, $fileName, $progress = true)
     {
@@ -136,7 +136,7 @@ class RemoteFilesystem
 
         // handle copy command if download was successful
         if (false !== $result && null !== $fileName) {
-            $result = (Boolean) @file_put_contents($fileName, $result);
+            $result = (bool) @file_put_contents($fileName, $result);
             if (false === $result) {
                 throw new TransportException('The "'.$fileUrl.'" file could not be written to '.$fileName);
             }
@@ -214,7 +214,15 @@ class RemoteFilesystem
 
     protected function getOptionsForUrl($originUrl)
     {
-        $options['http']['header'] = 'User-Agent: Composer/'.Composer::VERSION."\r\n";
+        $options['http']['header'] = sprintf(
+            "User-Agent: Composer/%s (%s; %s; PHP %s.%s.%s)\r\n",
+            Composer::VERSION,
+            php_uname('s'),
+            php_uname('r'),
+            PHP_MAJOR_VERSION,
+            PHP_MINOR_VERSION,
+            PHP_RELEASE_VERSION
+        );
         if (extension_loaded('zlib')) {
             $options['http']['header'] .= 'Accept-Encoding: gzip'."\r\n";
         }

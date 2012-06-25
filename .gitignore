@@ -1,5 +1,3 @@
 # Ignore files from Composer that we don't need.
-vendor/.composer
 vendor/bin
 composer.phar
-

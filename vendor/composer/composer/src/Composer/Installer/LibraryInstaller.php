@@ -140,6 +140,7 @@ class LibraryInstaller implements InstallerInterface
      */
     public function getInstallPath(PackageInterface $package)
     {
+        $this->initializeVendorDir();
         $targetDir = $package->getTargetDir();
 
         return ($this->vendorDir ? $this->vendorDir.'/' : '') . $package->getPrettyName() . ($targetDir ? '/'.$targetDir : '');
@@ -226,7 +227,7 @@ class LibraryInstaller implements InstallerInterface
             $line = fgets($handle);
             fclose($handle);
             if (preg_match('{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m', $line, $match)) {
-                $caller = $match[1];
+                $caller = trim($match[1]);
             } else {
                 $caller = 'php';
             }
@@ -238,7 +239,7 @@ class LibraryInstaller implements InstallerInterface
             "cd ".escapeshellarg(dirname($binPath))."\r\n".
             "set BIN_TARGET=%CD%\\".basename($binPath)."\r\n".
             "popd\r\n".
-            $caller." %BIN_TARGET% %*\r\n";
+            $caller." \"%BIN_TARGET%\" %*\r\n";
     }
 
     private function generateUnixyProxyCode($bin, $link)

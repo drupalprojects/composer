@@ -89,9 +89,12 @@ class ClassMapGenerator
     {
         $contents = file_get_contents($path);
         try {
+            if (!preg_match('{\b(?:class|interface|trait)\b}i', $contents)) {
+                return array();
+            }
             $tokens   = token_get_all($contents);
         } catch (\Exception $e) {
-            throw new RuntimeException('Could not scan for classes inside '.$path.": \n".$e->getMessage(), 0, $e);
+            throw new \RuntimeException('Could not scan for classes inside '.$path.": \n".$e->getMessage(), 0, $e);
         }
         $T_TRAIT  = version_compare(PHP_VERSION, '5.4', '<') ? -1 : T_TRAIT;
 

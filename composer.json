@@ -10,11 +10,10 @@
     }
   ],
   "support": {
-    "issues": "",
-    "source": ""
+    "issues": "http://drupal.org/project/issues/composer?categories=All",
+    "source": "http://drupalcode.org/project/composer.git"
   },
   "require": {
-    "composer/composer": "*"
+    "composer/composer": "1.*"
   }
 }
-

@@ -76,9 +76,6 @@ function drush_composer($command = '') {
   }
   $_SERVER['argc'] = count($_SERVER['argv']);
 
-  // Tell Drush that it ran successfully.
-  drush_set_context('DRUSH_EXECUTION_COMPLETED', TRUE);
-
   // Run the Composer command.
   $application = new Composer\Console\Application();
   $application->setAutoExit(false);

@@ -15,5 +15,6 @@
   },
   "require": {
     "composer/composer": "1.*"
-  }
+  },
+  "minimum-stability": "alpha"
 }

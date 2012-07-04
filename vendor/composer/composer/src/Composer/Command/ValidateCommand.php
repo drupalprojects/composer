@@ -91,7 +91,6 @@ EOT
                 }
             }
         } catch (\Exception $e) {
-            $output->writeln('<error>' . $file . ' contains a JSON Syntax Error:</error>');
             $output->writeln('<error>' . $e->getMessage() . '</error>');
 
             return 1;
@@ -108,6 +107,17 @@ EOT
             }
         } else {
             $warnings[] = 'No license specified, it is recommended to do so';
+        }
+
+        if (preg_match('{[A-Z]}', $manifest['name'])) {
+            $suggestName = preg_replace('{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}', '\\1\\3-\\2\\4', $manifest['name']);
+            $suggestName = strtolower($suggestName);
+
+            $warnings[] = sprintf(
+                'Name "%s" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using "%s" instead. As such you will not be able to submit it to Packagist.',
+                $manifest['name'],
+                $suggestName
+            );
         }
 
         // output errors/warnings

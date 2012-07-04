@@ -1,17 +1,9 @@
 {
-    "hash": "ad65f9a90134a22a0a1157dee3050c98",
+    "hash": "60bd22117d2b2468230808dc114f03d4",
     "packages": [
         {
             "package": "composer/composer",
-            "version": "dev-master",
-            "alias-pretty-version": "1.0.x-dev",
-            "alias-version": "1.0.9999999.9999999-dev"
-        },
-        {
-            "package": "composer/composer",
-            "version": "dev-master",
-            "source-reference": "cb7e86d5382d5cee8ae55e6ef9c526726e14dc47",
-            "commit-date": "1340643581"
+            "version": "1.0.0-alpha4"
         },
         {
             "package": "justinrainbow/json-schema",
@@ -23,46 +15,22 @@
         },
         {
             "package": "symfony/console",
-            "version": "dev-master",
-            "alias-pretty-version": "2.1.x-dev",
-            "alias-version": "2.1.9999999.9999999-dev"
-        },
-        {
-            "package": "symfony/console",
-            "version": "dev-master",
-            "source-reference": "v2.1.0-BETA1",
-            "commit-date": "1340057456"
+            "version": "v2.1.0-BETA1"
         },
         {
             "package": "symfony/finder",
-            "version": "dev-master",
-            "alias-pretty-version": "2.1.x-dev",
-            "alias-version": "2.1.9999999.9999999-dev"
-        },
-        {
-            "package": "symfony/finder",
-            "version": "dev-master",
-            "source-reference": "v2.1.0-BETA1",
-            "commit-date": "1340118982"
+            "version": "v2.1.0-BETA1"
         },
         {
             "package": "symfony/process",
-            "version": "dev-master",
-            "alias-pretty-version": "2.1.x-dev",
-            "alias-version": "2.1.9999999.9999999-dev"
-        },
-        {
-            "package": "symfony/process",
-            "version": "dev-master",
-            "source-reference": "v2.1.0-BETA1",
-            "commit-date": "1337882028"
+            "version": "v2.1.0-BETA1"
         }
     ],
     "packages-dev": null,
     "aliases": [
 
     ],
-    "minimum-stability": "dev",
+    "minimum-stability": "alpha",
     "stability-flags": [
 
     ]

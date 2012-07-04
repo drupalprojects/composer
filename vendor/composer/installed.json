@@ -1,5 +1,161 @@
 [
     {
+        "name": "symfony/process",
+        "version": "v2.1.0-BETA1",
+        "version_normalized": "2.1.0.0-beta1",
+        "target-dir": "Symfony/Component/Process",
+        "time": "2012-05-24 17:53:48",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Process",
+            "reference": "v2.1.0-BETA1"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Process/zipball/v2.1.0-BETA1",
+            "reference": "v2.1.0-BETA1",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
+        "license": [
+            "MIT"
+        ],
+        "authors": [
+            {
+                "name": "Fabien Potencier",
+                "email": "fabien@symfony.com",
+                "homepage": null,
+                "role": null
+            },
+            {
+                "name": "Symfony Community",
+                "email": null,
+                "homepage": "http://symfony.com/contributors",
+                "role": null
+            }
+        ],
+        "description": "Symfony Process Component",
+        "homepage": "http://symfony.com",
+        "autoload": {
+            "psr-0": {
+                "Symfony\\Component\\Process": ""
+            }
+        }
+    },
+    {
+        "name": "symfony/finder",
+        "version": "v2.1.0-BETA1",
+        "version_normalized": "2.1.0.0-beta1",
+        "target-dir": "Symfony/Component/Finder",
+        "time": "2012-06-19 15:16:22",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Finder",
+            "reference": "v2.1.0-BETA1"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Finder/zipball/v2.1.0-BETA1",
+            "reference": "v2.1.0-BETA1",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
+        "license": [
+            "MIT"
+        ],
+        "authors": [
+            {
+                "name": "Fabien Potencier",
+                "email": "fabien@symfony.com",
+                "homepage": null,
+                "role": null
+            },
+            {
+                "name": "Symfony Community",
+                "email": null,
+                "homepage": "http://symfony.com/contributors",
+                "role": null
+            }
+        ],
+        "description": "Symfony Finder Component",
+        "homepage": "http://symfony.com",
+        "autoload": {
+            "psr-0": {
+                "Symfony\\Component\\Finder": ""
+            }
+        }
+    },
+    {
+        "name": "symfony/console",
+        "version": "v2.1.0-BETA1",
+        "version_normalized": "2.1.0.0-beta1",
+        "target-dir": "Symfony/Component/Console",
+        "time": "2012-06-18 22:10:56",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Console",
+            "reference": "v2.1.0-BETA1"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Console/zipball/v2.1.0-BETA1",
+            "reference": "v2.1.0-BETA1",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
+        "license": [
+            "MIT"
+        ],
+        "authors": [
+            {
+                "name": "Fabien Potencier",
+                "email": "fabien@symfony.com",
+                "homepage": null,
+                "role": null
+            },
+            {
+                "name": "Symfony Community",
+                "email": null,
+                "homepage": "http://symfony.com/contributors",
+                "role": null
+            }
+        ],
+        "description": "Symfony Console Component",
+        "homepage": "http://symfony.com",
+        "autoload": {
+            "psr-0": {
+                "Symfony\\Component\\Console": ""
+            }
+        }
+    },
+    {
         "name": "seld/jsonlint",
         "version": "1.0.0",
         "version_normalized": "1.0.0.0",
@@ -110,184 +266,28 @@
         }
     },
     {
-        "name": "symfony/process",
-        "version": "dev-master",
-        "version_normalized": "9999999-dev",
-        "target-dir": "Symfony/Component/Process",
-        "time": "2012-05-24 17:53:48",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Process",
-            "reference": "v2.1.0-BETA1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Process/zipball/v2.1.0-BETA1",
-            "reference": "v2.1.0-BETA1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "source",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Process Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Process": ""
-            }
-        }
-    },
-    {
-        "name": "symfony/finder",
-        "version": "dev-master",
-        "version_normalized": "9999999-dev",
-        "target-dir": "Symfony/Component/Finder",
-        "time": "2012-06-19 15:16:22",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Finder",
-            "reference": "v2.1.0-BETA1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Finder/zipball/v2.1.0-BETA1",
-            "reference": "v2.1.0-BETA1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "source",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Finder Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Finder": ""
-            }
-        }
-    },
-    {
-        "name": "symfony/console",
-        "version": "dev-master",
-        "version_normalized": "9999999-dev",
-        "target-dir": "Symfony/Component/Console",
-        "time": "2012-06-18 22:10:56",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Console",
-            "reference": "v2.1.0-BETA1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Console/zipball/v2.1.0-BETA1",
-            "reference": "v2.1.0-BETA1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "source",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Console Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Console": ""
-            }
-        }
-    },
-    {
         "name": "composer/composer",
-        "version": "dev-master",
-        "version_normalized": "9999999-dev",
-        "time": "2012-06-25 16:59:41",
+        "version": "1.0.0-alpha4",
+        "version_normalized": "1.0.0.0-alpha4",
+        "time": "2012-07-04 13:13:14",
         "source": {
             "type": "git",
             "url": "http://github.com/composer/composer.git",
-            "reference": "cb7e86d5382d5cee8ae55e6ef9c526726e14dc47"
+            "reference": "1.0.0-alpha4"
         },
         "dist": {
             "type": "zip",
-            "url": "https://github.com/composer/composer/zipball/cb7e86d5382d5cee8ae55e6ef9c526726e14dc47",
-            "reference": "cb7e86d5382d5cee8ae55e6ef9c526726e14dc47",
+            "url": "https://github.com/composer/composer/zipball/1.0.0-alpha4",
+            "reference": "1.0.0-alpha4",
             "shasum": ""
         },
         "require": {
-            "symfony/console": "2.1.*",
-            "symfony/finder": "2.1.*",
-            "symfony/process": "2.1.*",
+            "php": ">=5.3.2",
             "justinrainbow/json-schema": "1.1.*",
             "seld/jsonlint": "1.*",
-            "php": ">=5.3.2"
+            "symfony/console": "2.1.*",
+            "symfony/finder": "2.1.*",
+            "symfony/process": "2.1.*"
         },
         "suggest": {
             "ext-zip": "Enabling the zip extension allows you to unzip archives, and allows gzip compression of all internet traffic"
@@ -301,7 +301,7 @@
                 "dev-master": "1.0-dev"
             }
         },
-        "installation-source": "source",
+        "installation-source": "dist",
         "license": [
             "MIT"
         ],

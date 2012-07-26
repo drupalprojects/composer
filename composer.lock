@@ -15,15 +15,15 @@
         },
         {
             "package": "symfony/console",
-            "version": "v2.1.0-BETA1"
+            "version": "v2.1.0-BETA4"
         },
         {
             "package": "symfony/finder",
-            "version": "v2.1.0-BETA1"
+            "version": "v2.1.0-BETA4"
         },
         {
             "package": "symfony/process",
-            "version": "v2.1.0-BETA1"
+            "version": "v2.1.0-BETA4"
         }
     ],
     "packages-dev": null,

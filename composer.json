@@ -3,6 +3,7 @@
   "description": "Drush wrapper around the PHP package management, Composer.",
   "homepage": "http://drupal.org/project/composer",
   "license": "GPL-2.0",
+  "type": "drupal-drush",
   "authors": [
     {
       "name": "Rob Loach",

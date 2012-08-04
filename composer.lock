@@ -1,5 +1,5 @@
 {
-    "hash": "60bd22117d2b2468230808dc114f03d4",
+    "hash": "5b1050da99b36ce3e79c77a9b098c3cc",
     "packages": [
         {
             "package": "composer/composer",
@@ -15,15 +15,15 @@
         },
         {
             "package": "symfony/console",
-            "version": "v2.1.0-BETA4"
+            "version": "v2.1.0-RC1"
         },
         {
             "package": "symfony/finder",
-            "version": "v2.1.0-BETA4"
+            "version": "v2.1.0-RC1"
         },
         {
             "package": "symfony/process",
-            "version": "v2.1.0-BETA4"
+            "version": "v2.1.0-RC1"
         }
     ],
     "packages-dev": null,

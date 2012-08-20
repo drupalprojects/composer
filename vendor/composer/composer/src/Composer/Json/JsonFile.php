@@ -40,8 +40,8 @@ class JsonFile
     /**
      * Initializes json file reader/parser.
      *
-     * @param string           $lockFile path to a lockfile
-     * @param RemoteFilesystem $rfs      required for loading http/https json files
+     * @param string           $path path to a lockfile
+     * @param RemoteFilesystem $rfs  required for loading http/https json files
      */
     public function __construct($path, RemoteFilesystem $rfs = null)
     {
@@ -53,6 +53,9 @@ class JsonFile
         $this->rfs = $rfs;
     }
 
+    /**
+     * @return string
+     */
     public function getPath()
     {
         return $this->path;
@@ -82,7 +85,7 @@ class JsonFile
                 $json = file_get_contents($this->path);
             }
         } catch (TransportException $e) {
-            throw new \RuntimeException('Could not read '.$this->path.', either you or the remote host is probably offline'."\n\n".$e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         } catch (\Exception $e) {
             throw new \RuntimeException('Could not read '.$this->path."\n\n".$e->getMessage());
         }

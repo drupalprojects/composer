@@ -100,7 +100,9 @@ It may include any of the other fields specified in the [schema](04-schema.md).
 #### notify
 
 The `notify` field allows you to specify an URL template for a URL that will
-be called every time a user installs a package.
+be called every time a user installs a package. The URL can be either an
+absolute path (that will use the same domain as the repository) or a fully
+qualified URL.
 
 An example value:
 
@@ -159,7 +161,8 @@ project to use the patched version. If the library is on GitHub (this is the
 case most of the time), you can simply fork it there and push your changes to
 your fork. After that you update the project's `composer.json`. All you have
 to do is add your fork as a repository and update the version constraint to
-point to your custom branch.
+point to your custom branch. For version constraint naming conventions see 
+[Libraries](02-libraries.md) for more information.
 
 Example assuming you patched monolog to fix a bug in the `bugfix` branch:
 
@@ -246,7 +249,7 @@ When you update one of your packages to composer naming scheme or made it availa
         "repositories": [
             {
                 "type": "git",
-                "https://github.com/foobar/intermediate.git"
+                "url": "https://github.com/foobar/intermediate.git"
             },
             {
                 "type": "pear",

@@ -197,7 +197,7 @@ class InstallerTest extends TestCase
         $application->get('install')->setCode(function ($input, $output) use ($installer) {
             $installer->setDevMode($input->getOption('dev'));
 
-            return $installer->run();
+            return $installer->run() ? 0 : 1;
         });
 
         $application->get('update')->setCode(function ($input, $output) use ($installer) {
@@ -206,7 +206,7 @@ class InstallerTest extends TestCase
                 ->setUpdate(true)
                 ->setUpdateWhitelist($input->getArgument('packages'));
 
-            return $installer->run();
+            return $installer->run() ? 0 : 1;
         });
 
         if (!preg_match('{^(install|update)\b}', $run)) {
@@ -247,7 +247,7 @@ class InstallerTest extends TestCase
                 --COMPOSER--\s*(?P<composer>'.$content.')\s*
                 (?:--LOCK--\s*(?P<lock>'.$content.'))?\s*
                 (?:--INSTALLED--\s*(?P<installed>'.$content.'))?\s*
-                (?:--INSTALLED:DEV--\s*(?P<installedDev>'.$content.'))?\s*
+                (?:--INSTALLED-DEV--\s*(?P<installedDev>'.$content.'))?\s*
                 --RUN--\s*(?P<run>.*?)\s*
                 (?:--EXPECT-LOCK--\s*(?P<expectLock>'.$content.'))?\s*
                 --EXPECT--\s*(?P<expect>.*?)\s*

@@ -346,7 +346,7 @@ class Installer
         try {
             $operations = $solver->solve($request);
         } catch (SolverProblemsException $e) {
-            $this->io->write('<error>Your requirements could not be solved to an installable set of packages.</error>');
+            $this->io->write('<error>Your requirements could not be resolved to an installable set of packages.</error>');
             $this->io->write($e->getMessage());
 
             return false;
@@ -465,8 +465,9 @@ class Installer
                 }
             }
 
-            if ($this->verbose) {
-                $this->io->write((string) $operation);
+            // output alias operations in verbose mode, or all ops in dry run
+            if ($this->dryRun || ($this->verbose && false !== strpos($operation->getJobType(), 'Alias'))) {
+                $this->io->write('  - ' . $operation);
             }
 
             $this->installationManager->execute($localRepo, $operation);
@@ -721,5 +722,17 @@ class Installer
         $this->updateWhitelist = array_flip(array_map('strtolower', $packages));
 
         return $this;
+    }
+
+    /**
+     * Disables custom installers.
+     *
+     * Call this if you want to ensure that third-party code never gets
+     * executed. The default is to automatically install, and execute
+     * custom third-party installers.
+     */
+    public function disableCustomInstallers()
+    {
+        $this->installationManager->disableCustomInstallers();
     }
 }

@@ -3,7 +3,6 @@
         "name": "seld/jsonlint",
         "version": "1.0.0",
         "version_normalized": "1.0.0.0",
-        "time": "2012-03-12 19:52:32",
         "source": {
             "type": "git",
             "url": "http://github.com/Seldaek/jsonlint",
@@ -18,11 +17,17 @@
         "require": {
             "php": ">=5.3.0"
         },
+        "time": "2012-03-12 23:52:32",
         "bin": [
             "bin/jsonlint"
         ],
         "type": "library",
         "installation-source": "dist",
+        "autoload": {
+            "psr-0": {
+                "Seld\\JsonLint": "src/"
+            }
+        },
         "license": [
             "MIT"
         ],
@@ -40,18 +45,12 @@
             "parser",
             "linter",
             "validator"
-        ],
-        "autoload": {
-            "psr-0": {
-                "Seld\\JsonLint": "src/"
-            }
-        }
+        ]
     },
     {
         "name": "justinrainbow/json-schema",
         "version": "1.1.0",
         "version_normalized": "1.1.0.0",
-        "time": "2012-01-03 15:33:17",
         "source": {
             "type": "git",
             "url": "git://github.com/justinrainbow/json-schema.git",
@@ -66,8 +65,14 @@
         "require": {
             "php": ">=5.3.0"
         },
+        "time": "2012-01-03 20:33:17",
         "type": "library",
         "installation-source": "dist",
+        "autoload": {
+            "psr-0": {
+                "JsonSchema": "src/"
+            }
+        },
         "license": [
             "NewBSD"
         ],
@@ -102,174 +107,12 @@
         "keywords": [
             "json",
             "schema"
-        ],
-        "autoload": {
-            "psr-0": {
-                "JsonSchema": "src/"
-            }
-        }
-    },
-    {
-        "name": "symfony/console",
-        "version": "v2.1.0-RC1",
-        "version_normalized": "2.1.0.0-RC1",
-        "target-dir": "Symfony/Component/Console",
-        "time": "2012-07-29 02:02:29",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Console",
-            "reference": "v2.1.0-RC1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Console/zipball/v2.1.0-RC1",
-            "reference": "v2.1.0-RC1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "dist",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Console Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Console": ""
-            }
-        }
-    },
-    {
-        "name": "symfony/finder",
-        "version": "v2.1.0-RC1",
-        "version_normalized": "2.1.0.0-RC1",
-        "target-dir": "Symfony/Component/Finder",
-        "time": "2012-07-29 02:02:29",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Finder",
-            "reference": "v2.1.0-RC1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Finder/zipball/v2.1.0-RC1",
-            "reference": "v2.1.0-RC1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "dist",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Finder Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Finder": ""
-            }
-        }
-    },
-    {
-        "name": "symfony/process",
-        "version": "v2.1.0-RC1",
-        "version_normalized": "2.1.0.0-RC1",
-        "target-dir": "Symfony/Component/Process",
-        "time": "2012-07-29 02:02:29",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/symfony/Process",
-            "reference": "v2.1.0-RC1"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/symfony/Process/zipball/v2.1.0-RC1",
-            "reference": "v2.1.0-RC1",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.3"
-        },
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "2.1-dev"
-            }
-        },
-        "installation-source": "dist",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Fabien Potencier",
-                "email": "fabien@symfony.com",
-                "homepage": null,
-                "role": null
-            },
-            {
-                "name": "Symfony Community",
-                "email": null,
-                "homepage": "http://symfony.com/contributors",
-                "role": null
-            }
-        ],
-        "description": "Symfony Process Component",
-        "homepage": "http://symfony.com",
-        "autoload": {
-            "psr-0": {
-                "Symfony\\Component\\Process": ""
-            }
-        }
+        ]
     },
     {
         "name": "composer/composer",
         "version": "1.0.0-alpha5",
         "version_normalized": "1.0.0.0-alpha5",
-        "time": "2012-08-18 15:19:24",
         "source": {
             "type": "git",
             "url": "https://github.com/composer/composer",
@@ -293,6 +136,7 @@
             "ext-zip": "Enabling the zip extension allows you to unzip archives, and allows gzip compression of all internet traffic",
             "ext-openssl": "Enabling the openssl extension allows you to access https URLs for repositories and packages"
         },
+        "time": "2012-08-18 19:19:24",
         "bin": [
             "bin/composer"
         ],
@@ -303,6 +147,11 @@
             }
         },
         "installation-source": "dist",
+        "autoload": {
+            "psr-0": {
+                "Composer": "src/"
+            }
+        },
         "license": [
             "MIT"
         ],
@@ -326,10 +175,104 @@
             "package",
             "dependency",
             "autoload"
-        ],
+        ]
+    },
+    {
+        "name": "symfony/console",
+        "version": "v2.1.0-RC2",
+        "version_normalized": "2.1.0.0-RC2",
+        "target-dir": "Symfony/Component/Console",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Console",
+            "reference": "v2.1.0-RC2"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Console/zipball/v2.1.0-RC2",
+            "reference": "v2.1.0-RC2",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "time": "2012-08-22 13:48:41",
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
         "autoload": {
             "psr-0": {
-                "Composer": "src/"
+                "Symfony\\Component\\Console": ""
+            }
+        }
+    },
+    {
+        "name": "symfony/finder",
+        "version": "v2.1.0-RC2",
+        "version_normalized": "2.1.0.0-RC2",
+        "target-dir": "Symfony/Component/Finder",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Finder",
+            "reference": "v2.1.0-RC2"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Finder/zipball/v2.1.0-RC2",
+            "reference": "v2.1.0-RC2",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "time": "2012-08-22 13:48:41",
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
+        "autoload": {
+            "psr-0": {
+                "Symfony\\Component\\Finder": ""
+            }
+        }
+    },
+    {
+        "name": "symfony/process",
+        "version": "v2.1.0-RC2",
+        "version_normalized": "2.1.0.0-RC2",
+        "target-dir": "Symfony/Component/Process",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/symfony/Process",
+            "reference": "v2.1.0-RC2"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/symfony/Process/zipball/v2.1.0-RC2",
+            "reference": "v2.1.0-RC2",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.3"
+        },
+        "time": "2012-08-26 13:13:51",
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "2.1-dev"
+            }
+        },
+        "installation-source": "dist",
+        "autoload": {
+            "psr-0": {
+                "Symfony\\Component\\Process": ""
             }
         }
     }

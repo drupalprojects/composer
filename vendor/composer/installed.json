@@ -3,7 +3,7 @@
         "name": "seld/jsonlint",
         "version": "1.0.0",
         "version_normalized": "1.0.0.0",
-        "time": "2012-03-12 15:52:32",
+        "time": "2012-03-12 19:52:32",
         "source": {
             "type": "git",
             "url": "http://github.com/Seldaek/jsonlint",
@@ -51,7 +51,7 @@
         "name": "justinrainbow/json-schema",
         "version": "1.1.0",
         "version_normalized": "1.1.0.0",
-        "time": "2012-01-03 10:33:17",
+        "time": "2012-01-03 15:33:17",
         "source": {
             "type": "git",
             "url": "git://github.com/justinrainbow/json-schema.git",
@@ -110,78 +110,11 @@
         }
     },
     {
-        "name": "composer/composer",
-        "version": "1.0.0-alpha4",
-        "version_normalized": "1.0.0.0-alpha4",
-        "time": "2012-07-04 21:13:14",
-        "source": {
-            "type": "git",
-            "url": "http://github.com/composer/composer.git",
-            "reference": "1.0.0-alpha4"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://github.com/composer/composer/zipball/1.0.0-alpha4",
-            "reference": "1.0.0-alpha4",
-            "shasum": ""
-        },
-        "require": {
-            "php": ">=5.3.2",
-            "justinrainbow/json-schema": "1.1.*",
-            "seld/jsonlint": "1.*",
-            "symfony/console": "2.1.*",
-            "symfony/finder": "2.1.*",
-            "symfony/process": "2.1.*"
-        },
-        "suggest": {
-            "ext-zip": "Enabling the zip extension allows you to unzip archives, and allows gzip compression of all internet traffic"
-        },
-        "bin": [
-            "bin/composer"
-        ],
-        "type": "library",
-        "extra": {
-            "branch-alias": {
-                "dev-master": "1.0-dev"
-            }
-        },
-        "installation-source": "dist",
-        "license": [
-            "MIT"
-        ],
-        "authors": [
-            {
-                "name": "Jordi Boggiano",
-                "email": "j.boggiano@seld.be",
-                "homepage": "http://seld.be",
-                "role": "Developer"
-            },
-            {
-                "name": "Nils Adermann",
-                "email": "naderman@naderman.de",
-                "homepage": "http://www.naderman.de",
-                "role": null
-            }
-        ],
-        "description": "Package Manager",
-        "homepage": "http://getcomposer.org/",
-        "keywords": [
-            "package",
-            "dependency",
-            "autoload"
-        ],
-        "autoload": {
-            "psr-0": {
-                "Composer": "src/"
-            }
-        }
-    },
-    {
         "name": "symfony/console",
         "version": "v2.1.0-RC1",
         "version_normalized": "2.1.0.0-RC1",
         "target-dir": "Symfony/Component/Console",
-        "time": "2012-07-28 22:02:29",
+        "time": "2012-07-29 02:02:29",
         "source": {
             "type": "git",
             "url": "https://github.com/symfony/Console",
@@ -233,7 +166,7 @@
         "version": "v2.1.0-RC1",
         "version_normalized": "2.1.0.0-RC1",
         "target-dir": "Symfony/Component/Finder",
-        "time": "2012-07-28 22:02:29",
+        "time": "2012-07-29 02:02:29",
         "source": {
             "type": "git",
             "url": "https://github.com/symfony/Finder",
@@ -285,7 +218,7 @@
         "version": "v2.1.0-RC1",
         "version_normalized": "2.1.0.0-RC1",
         "target-dir": "Symfony/Component/Process",
-        "time": "2012-07-28 22:02:29",
+        "time": "2012-07-29 02:02:29",
         "source": {
             "type": "git",
             "url": "https://github.com/symfony/Process",
@@ -329,6 +262,74 @@
         "autoload": {
             "psr-0": {
                 "Symfony\\Component\\Process": ""
+            }
+        }
+    },
+    {
+        "name": "composer/composer",
+        "version": "1.0.0-alpha5",
+        "version_normalized": "1.0.0.0-alpha5",
+        "time": "2012-08-18 15:19:24",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/composer/composer",
+            "reference": "1.0.0-alpha5"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://github.com/composer/composer/zipball/1.0.0-alpha5",
+            "reference": "1.0.0-alpha5",
+            "shasum": ""
+        },
+        "require": {
+            "php": ">=5.3.2",
+            "justinrainbow/json-schema": "1.1.*",
+            "seld/jsonlint": "1.*",
+            "symfony/console": "2.1.*@RC",
+            "symfony/finder": "2.1.*@RC",
+            "symfony/process": "2.1.*@RC"
+        },
+        "suggest": {
+            "ext-zip": "Enabling the zip extension allows you to unzip archives, and allows gzip compression of all internet traffic",
+            "ext-openssl": "Enabling the openssl extension allows you to access https URLs for repositories and packages"
+        },
+        "bin": [
+            "bin/composer"
+        ],
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "1.0-dev"
+            }
+        },
+        "installation-source": "dist",
+        "license": [
+            "MIT"
+        ],
+        "authors": [
+            {
+                "name": "Jordi Boggiano",
+                "email": "j.boggiano@seld.be",
+                "homepage": "http://seld.be",
+                "role": "Developer"
+            },
+            {
+                "name": "Nils Adermann",
+                "email": "naderman@naderman.de",
+                "homepage": "http://www.naderman.de",
+                "role": null
+            }
+        ],
+        "description": "Package Manager",
+        "homepage": "http://getcomposer.org/",
+        "keywords": [
+            "package",
+            "dependency",
+            "autoload"
+        ],
+        "autoload": {
+            "psr-0": {
+                "Composer": "src/"
             }
         }
     }

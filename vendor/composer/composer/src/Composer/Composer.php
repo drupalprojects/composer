@@ -24,7 +24,7 @@ use Composer\Downloader\DownloadManager;
  */
 class Composer
 {
-    const VERSION = '1.0.0-alpha4';
+    const VERSION = '1.0.0-alpha5';
 
     /**
      * @var Package\PackageInterface

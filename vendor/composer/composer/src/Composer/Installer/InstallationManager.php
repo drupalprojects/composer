@@ -23,7 +23,6 @@ use Composer\DependencyResolver\Operation\UpdateOperation;
 use Composer\DependencyResolver\Operation\UninstallOperation;
 use Composer\DependencyResolver\Operation\MarkAliasInstalledOperation;
 use Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation;
-use Composer\Util\Filesystem;
 
 /**
  * Package operation manager.
@@ -45,6 +44,24 @@ class InstallationManager
     {
         array_unshift($this->installers, $installer);
         $this->cache = array();
+    }
+
+    /**
+     * Disables custom installers.
+     *
+     * We prevent any custom installers from being instantiated by simply
+     * deactivating the installer for them. This ensure that no third-party
+     * code is ever executed.
+     */
+    public function disableCustomInstallers()
+    {
+        foreach ($this->installers as $i => $installer) {
+            if (!$installer instanceof InstallerInstaller) {
+                continue;
+            }
+
+            unset($this->installers[$i]);
+        }
     }
 
     /**

@@ -63,11 +63,33 @@ class GitDownloader extends VcsDownloader
         $this->updateToCommit($path, $ref, $target->getPrettyVersion(), $target->getReleaseDate());
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public function getLocalChanges($path)
+    {
+        $command = sprintf('cd %s && git status --porcelain --untracked-files=no', escapeshellarg($path));
+        if (0 !== $this->process->execute($command, $output)) {
+            throw new \RuntimeException('Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput());
+        }
+
+        return trim($output) ?: null;
+    }
+
     protected function updateToCommit($path, $reference, $branch, $date)
     {
         $template = 'git checkout %s && git reset --hard %1$s';
 
-        $command = sprintf($template, escapeshellarg($reference));
+        // check whether non-commitish are branches or tags, and fetch branches with the remote name
+        $gitRef = $reference;
+        if (!preg_match('{^[a-f0-9]{40}$}', $reference)
+            && 0 === $this->process->execute('git branch -r', $output, $path)
+            && preg_match('{^\s+composer/'.preg_quote($reference).'$}m', $output)
+        ) {
+            $gitRef = 'composer/'.$reference;
+        }
+
+        $command = sprintf($template, escapeshellarg($gitRef));
         if (0 === $this->process->execute($command, $output, $path)) {
             return;
         }
@@ -104,7 +126,7 @@ class GitDownloader extends VcsDownloader
             }
 
             // checkout the new recovered ref
-            $command = sprintf($template, escapeshellarg($newReference));
+            $command = sprintf($template, escapeshellarg($reference));
             if (0 === $this->process->execute($command, $output, $path)) {
                 $this->io->write('    '.$reference.' is gone (history was rewritten?), recovered by checking out '.$newReference);
 
@@ -113,21 +135,6 @@ class GitDownloader extends VcsDownloader
         }
 
         throw new \RuntimeException('Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function enforceCleanDirectory($path)
-    {
-        $command = sprintf('cd %s && git status --porcelain --untracked-files=no', escapeshellarg($path));
-        if (0 !== $this->process->execute($command, $output)) {
-            throw new \RuntimeException('Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput());
-        }
-
-        if (trim($output)) {
-            throw new \RuntimeException('Source directory ' . $path . ' has uncommitted changes');
-        }
     }
 
     /**
@@ -225,5 +232,19 @@ class GitDownloader extends VcsDownloader
             $cmd = sprintf('git remote set-url --push origin %s', escapeshellarg($pushUrl));
             $this->process->execute($cmd, $ignoredOutput, $path);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected function getCommitLogs($fromReference, $toReference, $path)
+    {
+        $command = sprintf('cd %s && git log %s..%s --pretty=format:"%%h - %%an: %%s"', escapeshellarg($path), $fromReference, $toReference);
+
+        if (0 !== $this->process->execute($command, $output)) {
+            throw new \RuntimeException('Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput());
+        }
+
+        return $output;
     }
 }

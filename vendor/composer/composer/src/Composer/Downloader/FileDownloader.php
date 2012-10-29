@@ -12,10 +12,12 @@
 
 namespace Composer\Downloader;
 
+use Composer\Config;
 use Composer\IO\IOInterface;
 use Composer\Package\PackageInterface;
 use Composer\Package\Version\VersionParser;
 use Composer\Util\Filesystem;
+use Composer\Util\GitHub;
 use Composer\Util\RemoteFilesystem;
 
 /**
@@ -28,6 +30,7 @@ use Composer\Util\RemoteFilesystem;
 class FileDownloader implements DownloaderInterface
 {
     protected $io;
+    protected $config;
     protected $rfs;
     protected $filesystem;
 
@@ -36,9 +39,10 @@ class FileDownloader implements DownloaderInterface
      *
      * @param IOInterface $io The IO instance
      */
-    public function __construct(IOInterface $io, RemoteFilesystem $rfs = null, Filesystem $filesystem = null)
+    public function __construct(IOInterface $io, Config $config, RemoteFilesystem $rfs = null, Filesystem $filesystem = null)
     {
         $this->io = $io;
+        $this->config = $config;
         $this->rfs = $rfs ?: new RemoteFilesystem($io);
         $this->filesystem = $filesystem ?: new Filesystem();
     }
@@ -67,10 +71,25 @@ class FileDownloader implements DownloaderInterface
 
         $this->io->write("  - Installing <info>" . $package->getName() . "</info> (<comment>" . VersionParser::formatVersion($package) . "</comment>)");
 
-        $processUrl = $this->processUrl($url);
+        $processUrl = $this->processUrl($package, $url);
 
         try {
-            $this->rfs->copy($package->getSourceUrl(), $processUrl, $fileName);
+            try {
+                $this->rfs->copy(parse_url($processUrl, PHP_URL_HOST), $processUrl, $fileName);
+            } catch (TransportException $e) {
+                if (404 === $e->getCode() && 'github.com' === parse_url($processUrl, PHP_URL_HOST)) {
+                    $message = "\n".'Could not fetch '.$processUrl.', enter your GitHub credentials to access private repos';
+                    $gitHubUtil = new GitHub($this->io, $this->config, null, $this->rfs);
+                    if (!$gitHubUtil->authorizeOAuth('github.com')
+                        && (!$this->io->isInteractive() || !$gitHubUtil->authorizeOAuthInteractively('github.com', $message))
+                    ) {
+                        throw $e;
+                    }
+                    $this->rfs->copy(parse_url($processUrl, PHP_URL_HOST), $processUrl, $fileName);
+                } else {
+                    throw $e;
+                }
+            }
 
             if (!file_exists($fileName)) {
                 throw new \UnexpectedValueException($url.' could not be saved to '.$fileName.', make sure the'
@@ -117,18 +136,19 @@ class FileDownloader implements DownloaderInterface
      */
     protected function getFileName(PackageInterface $package, $path)
     {
-        return $path.'/'.pathinfo($package->getDistUrl(), PATHINFO_BASENAME);
+        return $path.'/'.pathinfo(parse_url($package->getDistUrl(), PHP_URL_PATH), PATHINFO_BASENAME);
     }
 
     /**
      * Process the download url
      *
-     * @param  string $url download url
-     * @return string url
+     * @param  PackageInterface $package package the url is coming from
+     * @param  string           $url     download url
+     * @return string           url
      *
      * @throws \RuntimeException If any problem with the url
      */
-    protected function processUrl($url)
+    protected function processUrl(PackageInterface $package, $url)
     {
         if (!extension_loaded('openssl') && 0 === strpos($url, 'https:')) {
             throw new \RuntimeException('You must enable the openssl extension to download files via https');

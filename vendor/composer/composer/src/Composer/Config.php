@@ -12,6 +12,8 @@
 
 namespace Composer;
 
+use Composer\Config\ConfigSourceInterface;
+
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
@@ -22,23 +24,35 @@ class Config
         'vendor-dir' => 'vendor',
         'bin-dir' => '{$vendor-dir}/bin',
         'notify-on-install' => true,
+        'github-protocols' => array('git', 'https', 'http'),
     );
 
     public static $defaultRepositories = array(
         'packagist' => array(
             'type' => 'composer',
-            'url' => 'http://packagist.org',
+            'url' => 'https?://packagist.org',
         )
     );
 
     private $config;
     private $repositories;
+    private $configSource;
 
     public function __construct()
     {
         // load defaults
         $this->config = static::$defaultConfig;
         $this->repositories = static::$defaultRepositories;
+    }
+
+    public function setConfigSource(ConfigSourceInterface $source)
+    {
+        $this->configSource = $source;
+    }
+
+    public function getConfigSource()
+    {
+        return $this->configSource;
     }
 
     /**
@@ -109,6 +123,10 @@ class Config
                 return rtrim($this->process($this->config[$key]), '/\\');
 
             default:
+                if (!isset($this->config[$key])) {
+                    return null;
+                }
+
                 return $this->process($this->config[$key]);
         }
     }
@@ -133,6 +151,10 @@ class Config
     private function process($value)
     {
         $config = $this;
+
+        if (!is_string($value)) {
+            return $value;
+        }
 
         return preg_replace_callback('#\{\$(.+)\}#', function ($match) use ($config) {
             return $config->get($match[1]);

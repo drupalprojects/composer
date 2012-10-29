@@ -11,6 +11,8 @@
 
 namespace Symfony\Component\Process;
 
+use Symfony\Component\Process\Exception\RuntimeException;
+
 /**
  * Process is a thin wrapper around proc_* functions to ease
  * start independent PHP processes.
@@ -39,16 +41,20 @@ class Process
     private $timeout;
     private $options;
     private $exitcode;
+    private $fallbackExitcode;
     private $processInformation;
     private $stdout;
     private $stderr;
     private $enhanceWindowsCompatibility;
+    private $enhanceSigchildCompatibility;
     private $pipes;
     private $process;
     private $status = self::STATUS_READY;
 
     private $fileHandles;
     private $readBytes;
+
+    private static $sigchild;
 
     /**
      * Exit codes translation table.
@@ -133,6 +139,7 @@ class Process
         $this->stdin = $stdin;
         $this->setTimeout($timeout);
         $this->enhanceWindowsCompatibility = true;
+        $this->enhanceSigchildCompatibility = !defined('PHP_WINDOWS_VERSION_BUILD') && $this->isSigchildEnabled();
         $this->options = array_replace(array('suppress_errors' => true, 'binary_pipes' => true), $options);
     }
 
@@ -211,7 +218,20 @@ class Process
             );
             $descriptors = array(array('pipe', 'r'), $this->fileHandles[self::STDOUT], array('pipe', 'w'));
         } else {
-            $descriptors = array(array('pipe', 'r'), array('pipe', 'w'), array('pipe', 'w'));
+            $descriptors = array(
+                array('pipe', 'r'), // stdin
+                array('pipe', 'w'), // stdout
+                array('pipe', 'w'), // stderr
+            );
+
+            if ($this->enhanceSigchildCompatibility && $this->isSigchildEnabled()) {
+                // last exit code is output on the fourth pipe and caught to work around --enable-sigchild
+                $descriptors = array_merge($descriptors, array(array('pipe', 'w')));
+
+                $this->commandline = '('.$this->commandline.') 3>/dev/null; code=$?; echo $code >&3; exit $code';
+            } else {
+                $this->commandline = 'exec ' . $this->commandline;
+            }
         }
 
         $commandline = $this->commandline;
@@ -336,8 +356,14 @@ class Process
                 foreach ($r as $pipe) {
                     $type = array_search($pipe, $this->pipes);
                     $data = fread($pipe, 8192);
+
                     if (strlen($data) > 0) {
-                        call_user_func($callback, $type == 1 ? self::OUT : self::ERR, $data);
+                        // last exit code is output and caught to work around --enable-sigchild
+                        if (3 == $type) {
+                            $this->fallbackExitcode = (int) $data;
+                        } else {
+                            call_user_func($callback, $type == 1 ? self::OUT : self::ERR, $data);
+                        }
                     }
                     if (false === $data || feof($pipe)) {
                         fclose($pipe);
@@ -363,7 +389,13 @@ class Process
             throw new \RuntimeException(sprintf('The process stopped because of a "%s" signal.', $this->processInformation['stopsig']));
         }
 
-        return $this->exitcode = $this->processInformation['running'] ? $exitcode : $this->processInformation['exitcode'];
+        $this->exitcode = $this->processInformation['running'] ? $exitcode : $this->processInformation['exitcode'];
+
+        if (-1 == $this->exitcode && null !== $this->fallbackExitcode) {
+            $this->exitcode = $this->fallbackExitcode;
+        }
+
+        return $this->exitcode;
     }
 
     /**
@@ -399,10 +431,16 @@ class Process
      *
      * @return integer The exit status code
      *
+     * @throws RuntimeException In case --enable-sigchild is activated and the sigchild compatibility mode is disabled
+     *
      * @api
      */
     public function getExitCode()
     {
+        if ($this->isSigchildEnabled() && !$this->enhanceSigchildCompatibility) {
+            throw new RuntimeException('This PHP has been compiled with --enable-sigchild. You must use setEnhanceSigchildCompatibility() to use this method');
+        }
+
         $this->updateStatus();
 
         return $this->exitcode;
@@ -416,14 +454,16 @@ class Process
      *
      * @return string A string representation for the exit status code
      *
+     * @throws RuntimeException In case --enable-sigchild is activated and the sigchild compatibility mode is disabled
+     *
      * @see http://tldp.org/LDP/abs/html/exitcodes.html
      * @see http://en.wikipedia.org/wiki/Unix_signal
      */
     public function getExitCodeText()
     {
-        $this->updateStatus();
+        $exitcode = $this->getExitCode();
 
-        return isset(self::$exitCodes[$this->exitcode]) ? self::$exitCodes[$this->exitcode] : 'Unknown error';
+        return isset(self::$exitCodes[$exitcode]) ? self::$exitCodes[$exitcode] : 'Unknown error';
     }
 
     /**
@@ -431,13 +471,13 @@ class Process
      *
      * @return Boolean true if the process ended successfully, false otherwise
      *
+     * @throws RuntimeException In case --enable-sigchild is activated and the sigchild compatibility mode is disabled
+     *
      * @api
      */
     public function isSuccessful()
     {
-        $this->updateStatus();
-
-        return 0 == $this->exitcode;
+        return 0 == $this->getExitCode();
     }
 
     /**
@@ -447,10 +487,16 @@ class Process
      *
      * @return Boolean
      *
+     * @throws RuntimeException In case --enable-sigchild is activated
+     *
      * @api
      */
     public function hasBeenSignaled()
     {
+        if ($this->isSigchildEnabled()) {
+            throw new RuntimeException('This PHP has been compiled with --enable-sigchild. Term signal can not be retrieved');
+        }
+
         $this->updateStatus();
 
         return $this->processInformation['signaled'];
@@ -463,10 +509,16 @@ class Process
      *
      * @return integer
      *
+     * @throws RuntimeException In case --enable-sigchild is activated
+     *
      * @api
      */
     public function getTermSignal()
     {
+        if ($this->isSigchildEnabled()) {
+            throw new RuntimeException('This PHP has been compiled with --enable-sigchild. Term signal can not be retrieved');
+        }
+
         $this->updateStatus();
 
         return $this->processInformation['termsig'];
@@ -660,6 +712,30 @@ class Process
     }
 
     /**
+     * Return whether sigchild compatibility mode is activated or not
+     *
+     * @return Boolean
+     */
+    public function getEnhanceSigchildCompatibility()
+    {
+        return $this->enhanceSigchildCompatibility;
+    }
+
+    /**
+     * Activate sigchild compatibility mode
+     *
+     * Sigchild compatibility mode is required to get the exit code and
+     * determine the success of a process when PHP has been compiled with
+     * the --enable-sigchild option
+     *
+     * @param Boolean $enhance
+     */
+    public function setEnhanceSigchildCompatibility($enhance)
+    {
+        $this->enhanceSigchildCompatibility = (Boolean) $enhance;
+    }
+
+    /**
      * Builds up the callback used by wait().
      *
      * The callbacks adds all occurred output to the specific buffer and calls
@@ -722,6 +798,23 @@ class Process
         } elseif (isset($this->pipes[self::STDOUT]) && is_resource($this->pipes[self::STDOUT])) {
             $this->addOutput(stream_get_contents($this->pipes[self::STDOUT]));
         }
+    }
+
+    /**
+     * Return whether PHP has been compiled with the '--enable-sigchild' option or not
+     *
+     * @return Boolean
+     */
+    protected function isSigchildEnabled()
+    {
+        if (null !== self::$sigchild) {
+            return self::$sigchild;
+        }
+
+        ob_start();
+        phpinfo(INFO_GENERAL);
+
+        return self::$sigchild = false !== strpos(ob_get_clean(), '--enable-sigchild');
     }
 
     /**

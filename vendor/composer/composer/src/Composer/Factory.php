@@ -12,6 +12,7 @@
 
 namespace Composer;
 
+use Composer\Config\JsonConfigSource;
 use Composer\Json\JsonFile;
 use Composer\IO\IOInterface;
 use Composer\Repository\ComposerRepository;
@@ -20,7 +21,7 @@ use Composer\Util\ProcessExecutor;
 use Composer\Util\RemoteFilesystem;
 
 /**
- * Creates an configured instance of composer.
+ * Creates a configured instance of composer.
  *
  * @author Ryan Weaver <ryan@knplabs.com>
  * @author Jordi Boggiano <j.boggiano@seld.be>
@@ -38,7 +39,7 @@ class Factory
             if (defined('PHP_WINDOWS_VERSION_MAJOR')) {
                 $home = getenv('APPDATA') . '/Composer';
             } else {
-                $home = getenv('HOME') . '/.composer';
+                $home = rtrim(getenv('HOME'), '/') . '/.composer';
             }
         }
 
@@ -59,6 +60,7 @@ class Factory
         if ($file->exists()) {
             $config->merge($file->read());
         }
+        $config->setConfigSource(new JsonConfigSource($file));
 
         return $config;
     }
@@ -138,6 +140,13 @@ class Factory
         $config = static::createConfig();
         $config->merge($localConfig);
 
+        // reload oauth token from config if available
+        if ($tokens = $config->get('github-oauth')) {
+            foreach ($tokens as $domain => $token) {
+                $io->setAuthorization($domain, $token, 'x-oauth-basic');
+            }
+        }
+
         $vendorDir = $config->get('vendor-dir');
         $binDir = $config->get('bin-dir');
 
@@ -155,7 +164,7 @@ class Factory
         $package = $loader->load($localConfig);
 
         // initialize download manager
-        $dm = $this->createDownloadManager($io);
+        $dm = $this->createDownloadManager($io, $config);
 
         // initialize installation manager
         $im = $this->createInstallationManager($config);
@@ -219,16 +228,16 @@ class Factory
      * @param  IO\IOInterface             $io
      * @return Downloader\DownloadManager
      */
-    public function createDownloadManager(IOInterface $io)
+    public function createDownloadManager(IOInterface $io, Config $config)
     {
         $dm = new Downloader\DownloadManager();
-        $dm->setDownloader('git', new Downloader\GitDownloader($io));
-        $dm->setDownloader('svn', new Downloader\SvnDownloader($io));
-        $dm->setDownloader('hg', new Downloader\HgDownloader($io));
-        $dm->setDownloader('zip', new Downloader\ZipDownloader($io));
-        $dm->setDownloader('tar', new Downloader\TarDownloader($io));
-        $dm->setDownloader('phar', new Downloader\PharDownloader($io));
-        $dm->setDownloader('file', new Downloader\FileDownloader($io));
+        $dm->setDownloader('git', new Downloader\GitDownloader($io, $config));
+        $dm->setDownloader('svn', new Downloader\SvnDownloader($io, $config));
+        $dm->setDownloader('hg', new Downloader\HgDownloader($io, $config));
+        $dm->setDownloader('zip', new Downloader\ZipDownloader($io, $config));
+        $dm->setDownloader('tar', new Downloader\TarDownloader($io, $config));
+        $dm->setDownloader('phar', new Downloader\PharDownloader($io, $config));
+        $dm->setDownloader('file', new Downloader\FileDownloader($io, $config));
 
         return $dm;
     }

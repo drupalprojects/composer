@@ -38,6 +38,13 @@ class GitDriver extends VcsDriver
         } else {
             $this->repoDir = $this->config->get('home') . '/cache.git/' . preg_replace('{[^a-z0-9.]}i', '-', $this->url) . '/';
 
+            $fs = new Filesystem();
+            $fs->ensureDirectoryExists(dirname($this->repoDir));
+
+            if (!is_writable(dirname($this->repoDir))) {
+                throw new \RuntimeException('Can not clone '.$this->url.' to access package information. The "'.dirname($this->repoDir).'" directory is not writable by the current user.');
+            }
+
             // update the repo if it is a valid git repository
             if (is_dir($this->repoDir) && 0 === $this->process->execute('git remote', $output, $this->repoDir)) {
                 if (0 !== $this->process->execute('git remote update --prune origin', $output, $this->repoDir)) {
@@ -45,7 +52,6 @@ class GitDriver extends VcsDriver
                 }
             } else {
                 // clean up directory and do a fresh clone into it
-                $fs = new Filesystem();
                 $fs->removeDirectory($this->repoDir);
 
                 // added in git 1.7.1, prevents prompting the user
@@ -168,7 +174,7 @@ class GitDriver extends VcsDriver
             $this->process->execute('git branch --no-color --no-abbrev -v', $output, $this->repoDir);
             foreach ($this->process->splitLines($output) as $branch) {
                 if ($branch && !preg_match('{^ *[^/]+/HEAD }', $branch)) {
-                    if (preg_match('{^(?:\* )? *(?:[^/ ]+?/)?(\S+) *([a-f0-9]+) .*$}', $branch, $match)) {
+                    if (preg_match('{^(?:\* )? *(\S+) *([a-f0-9]+) .*$}', $branch, $match)) {
                        $branches[$match[1]] = $match[2];
                     }
                 }
@@ -185,7 +191,7 @@ class GitDriver extends VcsDriver
      */
     public static function supports(IOInterface $io, $url, $deep = false)
     {
-        if (preg_match('#(^git://|\.git$|git@|//git\.|//github.com/)#i', $url)) {
+        if (preg_match('#(^git://|\.git$|git(?:olite)?@|//git\.|//github.com/)#i', $url)) {
             return true;
         }
 

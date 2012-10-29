@@ -88,12 +88,16 @@ EOT
             unset($options['author']);
         }
 
-        $options['require'] = isset($options['require']) ?
-            $this->formatRequirements($options['require']) :
-            new \stdClass;
+        $options['require'] = isset($options['require']) ? $this->formatRequirements($options['require']) : new \stdClass;
+        if (array() === $options['require']) {
+            $options['require'] = new \stdClass;
+        }
 
         if (isset($options['require-dev'])) {
             $options['require-dev'] = $this->formatRequirements($options['require-dev']) ;
+            if (array() === $options['require-dev']) {
+                $options['require-dev'] = new \stdClass;
+            }
         }
 
         $file = new JsonFile('composer.json');
@@ -267,13 +271,12 @@ EOT
         }
 
         $token = strtolower($name);
-        foreach ($this->repos->getPackages() as $package) {
-            if (false === ($pos = strpos($package->getName(), $token))) {
-                continue;
-            }
 
-            $packages[] = $package;
-        }
+        $this->repos->filterPackages(function ($package) use ($token, &$packages) {
+            if (false !== strpos($package->getName(), $token)) {
+                $packages[] = $package;
+            }
+        });
 
         return $packages;
     }
@@ -360,7 +363,7 @@ EOT
             $requires[$packageName] = $packageVersion;
         }
 
-        return empty($requires) ? new \stdClass : $requires;
+        return $requires;
     }
 
     protected function normalizeRequirement($requirement)

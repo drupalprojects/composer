@@ -52,9 +52,9 @@ abstract class ArchiveDownloader extends FileDownloader
                 } else {
                     // Rename the content directory to avoid error when moving up
                     // a child folder with the same name
-                    $temporaryName = md5(time().rand());
-                    $this->filesystem->rename($contentDir, $temporaryName);
-                    $contentDir = $temporaryName;
+                    $temporaryDir = sys_get_temp_dir().'/'.md5(time().rand());
+                    $this->filesystem->rename($contentDir, $temporaryDir);
+                    $contentDir = $temporaryDir;
 
                     foreach (array_merge(glob($contentDir . '/.*'), glob($contentDir . '/*')) as $file) {
                         if (trim(basename($file), '.')) {
@@ -62,7 +62,7 @@ abstract class ArchiveDownloader extends FileDownloader
                         }
                     }
 
-                    rmdir($contentDir);
+                    $this->filesystem->removeDirectory($contentDir);
                 }
             }
         } catch (\Exception $e) {
@@ -85,8 +85,12 @@ abstract class ArchiveDownloader extends FileDownloader
     /**
      * {@inheritdoc}
      */
-    protected function processUrl($url)
+    protected function processUrl(PackageInterface $package, $url)
     {
+        if ($package->getDistReference() && preg_match('{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i', $url, $match)) {
+            $url = 'https://github.com/' . $match[1] . '/'. $match[2] . '/' . $match[3] . 'ball/' . $package->getDistReference();
+        }
+
         if (!extension_loaded('openssl') && (0 === strpos($url, 'https:') || 0 === strpos($url, 'http://github.com'))) {
             // bypass https for github if openssl is disabled
             if (preg_match('{^https?://(github.com/[^/]+/[^/]+/(zip|tar)ball/[^/]+)$}i', $url, $match)) {
@@ -96,7 +100,7 @@ abstract class ArchiveDownloader extends FileDownloader
             }
         }
 
-        return $url;
+        return parent::processUrl($package, $url);
     }
 
     /**

@@ -28,9 +28,10 @@ class InstallCommand extends Command
     {
         $this
             ->setName('install')
-            ->setDescription('Parses the composer.json file and downloads the needed dependencies.')
+            ->setDescription('Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json.')
             ->setDefinition(array(
                 new InputOption('prefer-source', null, InputOption::VALUE_NONE, 'Forces installation from package sources when possible, including VCS information.'),
+                new InputOption('prefer-dist', null, InputOption::VALUE_NONE, 'Forces installation from package dist even for dev versions.'),
                 new InputOption('dry-run', null, InputOption::VALUE_NONE, 'Outputs the operations but will not execute anything (implicitly enables --verbose).'),
                 new InputOption('dev', null, InputOption::VALUE_NONE, 'Enables installation of dev-require packages.'),
                 new InputOption('no-custom-installers', null, InputOption::VALUE_NONE, 'Disables all custom installers.'),
@@ -38,9 +39,10 @@ class InstallCommand extends Command
                 new InputOption('verbose', 'v', InputOption::VALUE_NONE, 'Shows more details including new commits pulled in when updating packages.'),
             ))
             ->setHelp(<<<EOT
-The <info>install</info> command reads the composer.json file from the
-current directory, processes it, and downloads and installs all the
-libraries and dependencies outlined in that file.
+The <info>install</info> command reads the composer.lock file from
+the current directory, processes it, and downloads and installs all the
+libraries and dependencies outlined in that file. If the file does not
+exist it will look for composer.json and do the same.
 
 <info>php composer.phar install</info>
 
@@ -59,6 +61,7 @@ EOT
             ->setDryRun($input->getOption('dry-run'))
             ->setVerbose($input->getOption('verbose'))
             ->setPreferSource($input->getOption('prefer-source'))
+            ->setPreferDist($input->getOption('prefer-dist'))
             ->setDevMode($input->getOption('dev'))
             ->setRunScripts(!$input->getOption('no-scripts'))
         ;

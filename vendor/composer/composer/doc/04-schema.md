@@ -53,7 +53,7 @@ Required for published packages (libraries).
 The version of the package.
 
 This must follow the format of `X.Y.Z` with an optional suffix of `-dev`,
-`alphaN`, `-betaN` or `-RCN`.
+`-alphaN`, `-betaN` or `-RCN`.
 
 Examples:
 
@@ -62,6 +62,7 @@ Examples:
     1.1.0
     0.2.5
     1.0.0-dev
+    1.0.0-alpha3
     1.0.0-beta2
     1.0.0-RC5
 
@@ -486,7 +487,8 @@ your project dependencies. Specific changes to the stability requirements of
 a given package can be done in `require` or `require-dev` (see
 [package links](#package-links)).
 
-Available options are `dev`, `alpha`, `beta`, `RC`, and `stable`.
+Available options (in order of stability) are `dev`, `alpha`, `beta`, `RC`,
+and `stable`.
 
 ### repositories <span>(root-only)</span>
 
@@ -502,8 +504,10 @@ ignored.
 The following repository types are supported:
 
 * **composer:** A composer repository is simply a `packages.json` file served
-  via HTTP, that contains a list of `composer.json` objects with additional
-  `dist` and/or `source` information.
+  via the network (HTTP, FTP, SSH), that contains a list of `composer.json`
+  objects with additional `dist` and/or `source` information. The `packages.json`
+  file is loaded using a PHP stream. You can set extra options on that stream
+  using the `options` parameter.
 * **vcs:** The version control system repository can fetch packages from git,
   svn and hg repositories.
 * **pear:** With this you can import any pear repository into your composer
@@ -521,6 +525,15 @@ Example:
             {
                 "type": "composer",
                 "url": "http://packages.example.com"
+            },
+            {
+                "type": "composer",
+                "url": "https://packages.example.com",
+                "options": {
+                    "ssl": {
+                        "verify_peer": "true"
+                    }
+                }
             },
             {
                 "type": "vcs",
@@ -567,6 +580,9 @@ The following options are supported:
 * **process-timeout:** Defaults to `300`. The duration processes like git clones
   can run before Composer assumes they died out. You may need to make this
   higher if you have a slow connection or huge vendors.
+* **github-protocols:** Defaults to `["git", "https", "http"]`. A list of
+  protocols to use for github.com clones, in priority order. Use this if you are
+  behind a proxy or have somehow bad performances with the git protocol.
 * **notify-on-install:** Defaults to `true`. Composer allows repositories to
   define a notification URL, so that they get notified whenever a package from
   that repository is installed. This option allows you to disable that behaviour.

@@ -53,7 +53,8 @@ class Solver
     {
         $decisionStart = count($this->decisions) - 1;
 
-        for ($ruleIndex = 0; $ruleIndex < count($this->rules); $ruleIndex++) {
+        $rulesCount = count($this->rules);
+        for ($ruleIndex = 0; $ruleIndex < $rulesCount; $ruleIndex++) {
             $rule = $this->rules->ruleById($ruleIndex);
 
             if (!$rule->isAssertion() || $rule->isDisabled()) {
@@ -115,7 +116,7 @@ class Solver
             }
             $this->problems[] = $problem;
 
-            $this->resetToOffset($decisionStart);
+            $this->decisions->resetToOffset($decisionStart);
             $ruleIndex = -1;
         }
     }

@@ -66,6 +66,15 @@ function composer_drush_command() {
  *   The Composer command we are to execute.
  */
 function drush_composer($command = '') {
+  // Make sure our PHP requirements are met.
+  $php = '5.3.2';
+  if (version_compare(phpversion(), $php, '>=')) {
+    drush_set_error('DRUSH_APPLICATION_ERROR', dt('Composer requires at least PHP !php in order to run properly.', array(
+      '!php' => $php,
+    )));
+    return false;
+  }
+
   // Autoload the required classes.
   $loader = require_once(__DIR__ . '/vendor/autoload.php');
 

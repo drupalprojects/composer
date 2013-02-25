@@ -28,6 +28,10 @@ use stdClass;
  */
 class JsonParser
 {
+    const DETECT_KEY_CONFLICTS = 1;
+    const ALLOW_DUPLICATE_KEYS = 2;
+
+    private $flags;
     private $stack;
     private $vstack; // semantic value stack
     private $lstack; // location stack
@@ -111,7 +115,7 @@ class JsonParser
     );
 
     /**
-     * @param string $input JSON string
+     * @param  string                $input JSON string
      * @return null|ParsingException null if no error is found, a ParsingException containing all details otherwise
      */
     public function lint($input)
@@ -124,12 +128,14 @@ class JsonParser
     }
 
     /**
-     * @param string $input JSON string
+     * @param  string           $input JSON string
      * @return mixed
      * @throws ParsingException
      */
-    public function parse($input)
+    public function parse($input, $flags = 0)
     {
+        $this->flags = $flags;
+
         $this->stack = array(0);
         $this->vstack = array(null);
         $this->lstack = array();
@@ -186,7 +192,31 @@ class JsonParser
                         }
                     }
 
-                    $errStr = 'Parse error on line ' . ($yylineno+1) . ":\n" . $this->lexer->showPosition() . "\nExpected one of: " . implode(', ', $expected);
+                    $message = null;
+                    if (in_array("'STRING'", $expected) && in_array(substr($this->lexer->match, 0, 1), array('"', "'"))) {
+                        $message = "Invalid string";
+                        if ("'" === substr($this->lexer->match, 0, 1)) {
+                            $message .= ", it appears you used single quotes instead of double quotes";
+                        } elseif (preg_match('{".+?(\\\\[^"bfnrt/\\\\u])}', $this->lexer->getUpcomingInput(), $match)) {
+                            $message .= ", it appears you have an unescaped backslash at: ".$match[1];
+                        } elseif (preg_match('{"(?:[^"]+|\\\\")*$}m', $this->lexer->getUpcomingInput())) {
+                            $message .= ", it appears you forgot to terminated the string, or attempted to write a multiline string which is invalid";
+                        }
+                    }
+
+                    $errStr = 'Parse error on line ' . ($yylineno+1) . ":\n";
+                    $errStr .= $this->lexer->showPosition() . "\n";
+                    if ($message) {
+                        $errStr .= $message;
+                    } else {
+                        $errStr .= (count($expected) > 1) ? "Expected one of: " : "Expected: ";
+                        $errStr .= implode(', ', $expected);
+                    }
+
+                    if (',' === substr(trim($this->lexer->getPastInput()), -1)) {
+                        $errStr .= " - It appears you have an extra trailing comma";
+                    }
+
                     $this->parseError($errStr, array(
                         'text' => $this->lexer->match,
                         'token' => !empty($this->terminals_[$symbol]) ? $this->terminals_[$symbol] : $symbol,
@@ -286,9 +316,11 @@ class JsonParser
                     break;
 
                 case 3: // accept
+
                     return true;
             }
         }
+
         return true;
     }
 
@@ -300,12 +332,13 @@ class JsonParser
     // $$ = $tokens // needs to be passed by ref?
     // $ = $token
     // _$ removed, useless?
-    private function performAction(stdClass $yyval, $yytext, $yyleng, $yylineno, $yystate, &$tokens) {
+    private function performAction(stdClass $yyval, $yytext, $yyleng, $yylineno, $yystate, &$tokens)
+    {
         // $0 = $len
         $len = count($tokens) - 1;
         switch ($yystate) {
         case 1:
-            $yytext =preg_replace_callback('{(?:\\\\["bfnrt/\\\\]|\\\\u[a-fA-F0-9]{4})}', array($this, 'stringInterpolation'), $yytext);
+            $yytext = preg_replace_callback('{(?:\\\\["bfnrt/\\\\]|\\\\u[a-fA-F0-9]{4})}', array($this, 'stringInterpolation'), $yytext);
             $yyval->token = $yytext;
             break;
         case 2:
@@ -342,7 +375,20 @@ class JsonParser
             break;
         case 17:
             $yyval->token = $tokens[$len-2];
-            $tokens[$len-2]->{$tokens[$len][0]} = $tokens[$len][1];
+            $key = $tokens[$len][0] === '' ? '_empty_' : $tokens[$len][0];
+            if (($this->flags & self::DETECT_KEY_CONFLICTS) && isset($tokens[$len-2]->{$key})) {
+                $errStr = 'Parse error on line ' . ($yylineno+1) . ":\n";
+                $errStr .= $this->lexer->showPosition() . "\n";
+                $errStr .= "Duplicate key: ".$tokens[$len][0];
+                throw new ParsingException($errStr);
+            } elseif (($this->flags & self::ALLOW_DUPLICATE_KEYS) && isset($tokens[$len-2]->{$key})) {
+                $duplicateCount = 1;
+                do {
+                    $duplicateKey = $key . '.' . $duplicateCount++;
+                } while (isset($tokens[$len-2]->$duplicateKey));
+                $key = $duplicateKey;
+            }
+            $tokens[$len-2]->$key = $tokens[$len][1];
             break;
         case 18:
             $yyval->token = array();
@@ -400,6 +446,7 @@ class JsonParser
         if (!is_numeric($token)) {
             $token = isset($this->symbols[$token]) ? $this->symbols[$token] : $token;
         }
+
         return $token;
     }
 }

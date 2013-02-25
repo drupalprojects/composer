@@ -43,19 +43,33 @@ class Lexer
         ),
     );
 
+    private $conditionStack;
+    private $input;
+    private $more;
+    private $done;
+    private $matched;
+
+    public $match;
+    public $yylineno;
+    public $yyleng;
+    public $yytext;
+    public $yylloc;
+
     public function lex()
     {
         $r = $this->next();
         if (!$r instanceof Undefined) {
             return $r;
         }
+
         return $this->lex();
     }
 
     public function setInput($input)
     {
-        $this->_input = $input;
-        $this->_more = $this->_less = $this->done = false;
+        $this->input = $input;
+        $this->more = false;
+        $this->done = false;
         $this->yylineno = $this->yyleng = 0;
         $this->yytext = $this->matched = $this->match = '';
         $this->conditionStack = array('INITIAL');
@@ -66,9 +80,27 @@ class Lexer
 
     public function showPosition()
     {
-        $pre = $this->pastInput();
+        $pre = str_replace("\n", '', $this->getPastInput());
         $c = str_repeat('-', strlen($pre)); // new Array(pre.length + 1).join("-");
-        return $pre . $this->upcomingInput() . "\n" . $c . "^";
+
+        return $pre . str_replace("\n", '', $this->getUpcomingInput()) . "\n" . $c . "^";
+    }
+
+    public function getPastInput()
+    {
+        $past = substr($this->matched, 0, strlen($this->matched) - strlen($this->match));
+
+        return (strlen($past) > 20 ? '...' : '') . substr($past, -20);
+    }
+
+    public function getUpcomingInput()
+    {
+        $next = $this->match;
+        if (strlen($next) < 20) {
+            $next .= substr($this->input, 0, 20 - strlen($next));
+        }
+
+        return substr($next, 0, 20) . (strlen($next) > 20 ? '...' : '');
     }
 
     protected function parseError($str, $hash)
@@ -76,53 +108,12 @@ class Lexer
         throw new \Exception($str);
     }
 
-    private function input()
-    {
-        $ch = $this->_input[0];
-        $this->yytext += $ch;
-        $this->yyleng++;
-        $this->match += $ch;
-        $this->matched += $ch;
-        if (strpos($ch, "\n") !== false) {
-            $this->yylineno++;
-        }
-        array_shift($this->_input); // slice(1)
-        return $ch;
-    }
-
-    private function unput($ch)
-    {
-        $this->_input = $ch . $this->_input;
-        return $this;
-    }
-
-    private function more()
-    {
-        $this->_more = true;
-        return $this;
-    }
-
-    private function pastInput()
-    {
-        $past = substr($this->matched, 0, strlen($this->matched) - strlen($this->match));
-        return (strlen($past) > 20 ? '...' : '') . str_replace("\n", '', substr($past, -20));
-    }
-
-    private function upcomingInput()
-    {
-        $next = $this->match;
-        if (strlen($next) < 20) {
-            $next += substr($this->_input, 0, 20 - strlen($next));
-        }
-        return str_replace("\n", '', substr($next, 0, 20) . (strlen($next) > 20 ? '...' : ''));
-    }
-
     private function next()
     {
         if ($this->done) {
             return $this->EOF;
         }
-        if (!$this->_input) {
+        if (!$this->input) {
             $this->done = true;
         }
 
@@ -131,16 +122,16 @@ class Lexer
         $col = null;
         $lines = null;
 
-        if (!$this->_more) {
+        if (!$this->more) {
             $this->yytext = '';
             $this->match = '';
         }
 
-        $rules = $this->_currentRules();
+        $rules = $this->getCurrentRules();
         $rulesLen = count($rules);
 
         for ($i=0; $i < $rulesLen; $i++) {
-            if (preg_match($this->rules[$rules[$i]], $this->_input, $match)) {
+            if (preg_match($this->rules[$rules[$i]], $this->input, $match)) {
                 preg_match_all('/\n.*/', $match[0], $lines);
                 $lines = $lines[0];
                 if ($lines) {
@@ -157,18 +148,19 @@ class Lexer
                 $this->match .= $match[0];
                 $this->matches = $match;
                 $this->yyleng = strlen($this->yytext);
-                $this->_more = false;
-                $this->_input = substr($this->_input, strlen($match[0]));
+                $this->more = false;
+                $this->input = substr($this->input, strlen($match[0]));
                 $this->matched .= $match[0];
                 $token = $this->performAction($rules[$i], $this->conditionStack[count($this->conditionStack)-1]);
                 if ($token) {
                     return $token;
                 }
+
                 return new Undefined();
             }
         }
 
-        if ($this->_input === "") {
+        if ($this->input === "") {
             return $this->EOF;
         }
 
@@ -192,7 +184,7 @@ class Lexer
         return array_pop($this->conditionStack);
     }
 
-    private function _currentRules()
+    private function getCurrentRules()
     {
         return $this->conditions[$this->conditionStack[count($this->conditionStack)-1]]['rules'];
     }
@@ -208,6 +200,7 @@ class Lexer
            break;
         case 2:
             $this->yytext = substr($this->yytext, 1, $this->yyleng-2);
+
             return 4;
         case 3:
             return 17;

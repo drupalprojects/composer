@@ -68,9 +68,11 @@ function composer_drush_command() {
 function drush_composer($command = '') {
   // Make sure our PHP requirements are met.
   $php = '5.3.2';
-  if (version_compare(phpversion(), $php, '>=')) {
-    drush_set_error('DRUSH_APPLICATION_ERROR', dt('Composer requires at least PHP !php in order to run properly.', array(
+  $current = phpversion();
+  if (version_compare($current, $php, '<')) {
+    drush_set_error('DRUSH_APPLICATION_ERROR', dt('Composer requires at least PHP !php in order to run properly. You are currently on PHP !current.', array(
       '!php' => $php,
+      '!current' => $current,
     )));
     return false;
   }

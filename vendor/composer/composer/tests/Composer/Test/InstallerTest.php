@@ -52,8 +52,9 @@ class InstallerTest extends TestCase
 
         $locker = $this->getMockBuilder('Composer\Package\Locker')->disableOriginalConstructor()->getMock();
         $installationManager = new InstallationManagerMock();
+
         $eventDispatcher = $this->getMockBuilder('Composer\Script\EventDispatcher')->disableOriginalConstructor()->getMock();
-        $autoloadGenerator = $this->getMock('Composer\Autoload\AutoloadGenerator');
+        $autoloadGenerator = $this->getMockBuilder('Composer\Autoload\AutoloadGenerator')->disableOriginalConstructor()->getMock();
 
         $installer = new Installer($io, $config, clone $rootPackage, $downloadManager, $repositoryManager, $locker, $installationManager, $eventDispatcher, $autoloadGenerator);
         $result = $installer->run();
@@ -184,13 +185,14 @@ class InstallerTest extends TestCase
         $locker = new Locker($lockJsonMock, $repositoryManager, $composer->getInstallationManager(), md5(json_encode($composerConfig)));
         $composer->setLocker($locker);
 
-        $autoloadGenerator = $this->getMock('Composer\Autoload\AutoloadGenerator');
+        $eventDispatcher = $this->getMockBuilder('Composer\Script\EventDispatcher')->disableOriginalConstructor()->getMock();
+        $autoloadGenerator = $this->getMock('Composer\Autoload\AutoloadGenerator', array(), array($eventDispatcher));
+        $composer->setAutoloadGenerator($autoloadGenerator);
+        $composer->setEventDispatcher($eventDispatcher);
 
         $installer = Installer::create(
             $io,
-            $composer,
-            null,
-            $autoloadGenerator
+            $composer
         );
 
         $application = new Application;

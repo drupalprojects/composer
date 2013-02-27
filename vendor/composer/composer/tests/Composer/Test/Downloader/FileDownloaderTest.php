@@ -23,7 +23,7 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
         $config = $config ?: $this->getMock('Composer\Config');
         $rfs = $rfs ?: $this->getMockBuilder('Composer\Util\RemoteFilesystem')->disableOriginalConstructor()->getMock();
 
-        return new FileDownloader($io, $config, $rfs);
+        return new FileDownloader($io, $config, null, $rfs);
     }
 
     /**
@@ -56,8 +56,11 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
             $downloader->download($packageMock, $path);
             $this->fail();
         } catch (\Exception $e) {
-            if (file_exists($path)) {
-                unset($path);
+            if (is_dir($path)) {
+                $fs = new Filesystem();
+                $fs->removeDirectory($path);
+            } elseif (is_file($path)) {
+                unlink($path);
             }
             $this->assertInstanceOf('RuntimeException', $e);
             $this->assertContains('exists and is not a directory', $e->getMessage());
@@ -88,7 +91,7 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
         ;
 
         do {
-            $path = sys_get_temp_dir().'/'.md5(time().rand());
+            $path = sys_get_temp_dir().'/'.md5(time().mt_rand());
         } while (file_exists($path));
 
         $ioMock = $this->getMock('Composer\IO\IOInterface');
@@ -112,7 +115,7 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
                 $fs = new Filesystem();
                 $fs->removeDirectory($path);
             } elseif (is_file($path)) {
-                unset($path);
+                unlink($path);
             }
 
             $this->assertInstanceOf('UnexpectedValueException', $e);
@@ -133,7 +136,7 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
         ;
 
         do {
-            $path = sys_get_temp_dir().'/'.md5(time().rand());
+            $path = sys_get_temp_dir().'/'.md5(time().mt_rand());
         } while (file_exists($path));
 
         $downloader = $this->getDownloader();
@@ -150,7 +153,7 @@ class FileDownloaderTest extends \PHPUnit_Framework_TestCase
                 $fs = new Filesystem();
                 $fs->removeDirectory($path);
             } elseif (is_file($path)) {
-                unset($path);
+                unlink($path);
             }
 
             $this->assertInstanceOf('UnexpectedValueException', $e);

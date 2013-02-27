@@ -28,7 +28,7 @@ class DumpAutoloadCommand extends Command
         $this
             ->setName('dump-autoload')
             ->setAliases(array('dumpautoload'))
-            ->setDescription('dumps the autoloader')
+            ->setDescription('Dumps the autoloader')
             ->setDefinition(array(
                 new InputOption('optimize', 'o', InputOption::VALUE_NONE, 'Optimizes PSR0 packages to be loaded with classmaps too, good for production.'),
             ))
@@ -49,7 +49,6 @@ EOT
         $package = $composer->getPackage();
         $config = $composer->getConfig();
 
-        $generator = new AutoloadGenerator();
-        $generator->dump($config, $localRepos, $package, $installationManager, 'composer', $input->getOption('optimize'));
+        $composer->getAutoloadGenerator()->dump($config, $localRepos, $package, $installationManager, 'composer', $input->getOption('optimize'));
     }
 }

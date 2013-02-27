@@ -31,6 +31,12 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
         ));
     }
 
+    public function tearDown()
+    {
+        $fs = new Filesystem;
+        $fs->removeDirectory(sys_get_temp_dir() . '/composer-test');
+    }
+
     public function testPrivateRepository()
     {
         $repoUrl = 'http://github.com/composer/packagist';
@@ -69,7 +75,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
             ->will($this->returnValue('somepassword'));
 
         $io->expects($this->any())
-            ->method('setAuthorization')
+            ->method('setAuthentication')
             ->with($this->equalTo('github.com'), $this->matchesRegularExpression('{someuser|abcdef}'), $this->matchesRegularExpression('{somepassword|x-oauth-basic}'));
 
         $remoteFilesystem->expects($this->at(1))
@@ -97,7 +103,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($identifier);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/v0.0.0', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/v0.0.0', $dist['url']);
         $this->assertEquals('v0.0.0', $dist['reference']);
 
         $source = $gitHubDriver->getSource($identifier);
@@ -107,7 +113,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($sha);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/v0.0.0', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/v0.0.0', $dist['url']);
         $this->assertEquals('v0.0.0', $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);
@@ -140,6 +146,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
         $repoConfig = array(
             'url' => $repoUrl,
         );
+        $repoUrl = 'https://github.com/composer/packagist.git';
 
         $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, null, $remoteFilesystem);
         $gitHubDriver->initialize();
@@ -149,7 +156,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($identifier);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/v0.0.0', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/v0.0.0', $dist['url']);
         $this->assertEquals($identifier, $dist['reference']);
 
         $source = $gitHubDriver->getSource($identifier);
@@ -159,7 +166,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($sha);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/v0.0.0', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/v0.0.0', $dist['url']);
         $this->assertEquals($identifier, $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);
@@ -191,8 +198,8 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $remoteFilesystem->expects($this->at(1))
             ->method('getContents')
-            ->with($this->equalTo('github.com'), $this->equalTo('https://raw.github.com/composer/packagist/feature%2F3.2-foo/composer.json'), $this->equalTo(false))
-            ->will($this->returnValue('{"support": {"source": "'.$repoUrl.'" }}'));
+            ->with($this->equalTo('github.com'), $this->equalTo('https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo'), $this->equalTo(false))
+            ->will($this->returnValue('{"encoding":"base64","content":"'.base64_encode('{"support": {"source": "'.$repoUrl.'" }}').'"}'));
 
         $remoteFilesystem->expects($this->at(2))
             ->method('getContents')
@@ -202,6 +209,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
         $repoConfig = array(
             'url' => $repoUrl,
         );
+        $repoUrl = 'https://github.com/composer/packagist.git';
 
         $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, null, $remoteFilesystem);
         $gitHubDriver->initialize();
@@ -211,7 +219,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($identifier);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/feature/3.2-foo', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/feature/3.2-foo', $dist['url']);
         $this->assertEquals($identifier, $dist['reference']);
 
         $source = $gitHubDriver->getSource($identifier);
@@ -221,7 +229,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $dist = $gitHubDriver->getDist($sha);
         $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://github.com/composer/packagist/zipball/feature/3.2-foo', $dist['url']);
+        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/feature/3.2-foo', $dist['url']);
         $this->assertEquals($identifier, $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);

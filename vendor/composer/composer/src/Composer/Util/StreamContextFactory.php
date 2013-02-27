@@ -16,6 +16,7 @@ namespace Composer\Util;
  * Allows the creation of a basic context supporting http proxy
  *
  * @author Jordan Alliot <jordan.alliot@gmail.com>
+ * @author Markus Tacker <m@coderbyheart.de>
  */
 final class StreamContextFactory
 {
@@ -38,7 +39,7 @@ final class StreamContextFactory
         }
 
         if (!empty($proxy)) {
-            $proxyURL = (isset($proxy['scheme']) ? $proxy['scheme'] : '') . '://';
+            $proxyURL = isset($proxy['scheme']) ? $proxy['scheme'] . '://' : '';
             $proxyURL .= isset($proxy['host']) ? $proxy['host'] : '';
 
             if (isset($proxy['port'])) {
@@ -70,6 +71,9 @@ final class StreamContextFactory
 
                 // Preserve headers if already set in default options
                 if (isset($defaultOptions['http']['header'])) {
+                    if (is_string($defaultOptions['http']['header'])) {
+                        $defaultOptions['http']['header'] = array($defaultOptions['http']['header']);
+                    }
                     $defaultOptions['http']['header'][] = "Proxy-Authorization: Basic {$auth}";
                 } else {
                     $options['http']['header'] = array("Proxy-Authorization: Basic {$auth}");
@@ -79,6 +83,32 @@ final class StreamContextFactory
 
         $options = array_replace_recursive($options, $defaultOptions);
 
+        if (isset($options['http']['header'])) {
+            $options['http']['header'] = self::fixHttpHeaderField($options['http']['header']);
+        }
+
         return stream_context_create($options, $defaultParams);
+    }
+
+    /**
+     * A bug in PHP prevents the headers from correctly beeing sent when a content-type header is present and
+     * NOT at the end of the array
+     *
+     * This method fixes the array by moving the content-type header to the end
+     *
+     * @link https://bugs.php.net/bug.php?id=61548
+     * @param $header
+     * @return array
+     */
+    private static function fixHttpHeaderField($header)
+    {
+        if (!is_array($header)) {
+            $header = explode("\r\n", $header);
+        }
+        uasort($header, function ($el) {
+            return preg_match('{^content-type}i', $el) ? 1 : -1;
+        });
+
+        return $header;
     }
 }

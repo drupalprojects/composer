@@ -1,6 +1,6 @@
 {
     "name": "composer/composer",
-    "description": "Package Manager",
+    "description": "Dependency Manager",
     "keywords": ["package", "dependency", "autoload"],
     "homepage": "http://getcomposer.org/",
     "type": "library",
@@ -28,6 +28,9 @@
         "symfony/console": "~2.1@dev",
         "symfony/finder": "~2.1",
         "symfony/process": "~2.1@dev"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "~3.7.10"
     },
     "suggest": {
         "ext-zip": "Enabling the zip extension allows you to unzip archives, and allows gzip compression of all internet traffic",

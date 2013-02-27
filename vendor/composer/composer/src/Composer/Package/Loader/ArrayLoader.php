@@ -135,11 +135,17 @@ class ArrayLoader implements LoaderInterface
         }
 
         if (!empty($config['time'])) {
+            $time = ctype_digit($config['time']) ? '@'.$config['time'] : $config['time'];
+
             try {
-                $date = new \DateTime($config['time'], new \DateTimeZone('UTC'));
+                $date = new \DateTime($time, new \DateTimeZone('UTC'));
                 $package->setReleaseDate($date);
             } catch (\Exception $e) {
             }
+        }
+
+        if (!empty($config['notification-url'])) {
+            $package->setNotificationUrl($config['notification-url']);
         }
 
         if ($package instanceof Package\CompletePackageInterface) {

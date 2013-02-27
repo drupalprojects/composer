@@ -14,6 +14,7 @@ namespace Composer\Util;
 
 use Composer\Package\Loader\ArrayLoader;
 use Composer\Package\Loader\ValidatingArrayLoader;
+use Composer\Package\Loader\InvalidPackageException;
 use Composer\Json\JsonValidationException;
 use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
@@ -73,15 +74,25 @@ class ConfigValidator
 
         // validate actual data
         if (!empty($manifest['license'])) {
+            // strip proprietary since it's not a valid SPDX identifier, but is accepted by composer
+            if (is_array($manifest['license'])) {
+                foreach ($manifest['license'] as $key => $license) {
+                    if ('proprietary' === $license) {
+                        unset($manifest['license'][$key]);
+                    }
+                }
+            }
+
             $licenseValidator = new SpdxLicenseIdentifier();
-            if (!$licenseValidator->validate($manifest['license'])) {
+            if ('proprietary' !== $manifest['license'] && array() !== $manifest['license'] && !$licenseValidator->validate($manifest['license'])) {
                 $warnings[] = sprintf(
-                    'License %s is not a valid SPDX license identifier, see http://www.spdx.org/licenses/ if you use an open license',
+                    'License %s is not a valid SPDX license identifier, see http://www.spdx.org/licenses/ if you use an open license.'
+                    ."\nIf the software is closed-source, you may use \"proprietary\" as license.",
                     json_encode($manifest['license'])
                 );
             }
         } else {
-            $warnings[] = 'No license specified, it is recommended to do so';
+            $warnings[] = 'No license specified, it is recommended to do so. For closed-source software you may use "proprietary" as license.';
         }
 
         if (!empty($manifest['name']) && preg_match('{[A-Z]}', $manifest['name'])) {
@@ -95,9 +106,8 @@ class ConfigValidator
             );
         }
 
-        // TODO validate package repositories' packages using the same technique as below
         try {
-            $loader = new ValidatingArrayLoader(new ArrayLoader(), false);
+            $loader = new ValidatingArrayLoader(new ArrayLoader());
             if (!isset($manifest['version'])) {
                 $manifest['version'] = '1.0.0';
             }
@@ -105,9 +115,11 @@ class ConfigValidator
                 $manifest['name'] = 'dummy/dummy';
             }
             $loader->load($manifest);
-        } catch (\Exception $e) {
-            $errors = array_merge($errors, explode("\n", $e->getMessage()));
+        } catch (InvalidPackageException $e) {
+            $errors = array_merge($errors, $e->getErrors());
         }
+
+        $warnings = array_merge($warnings, $loader->getWarnings());
 
         return array($errors, $publishErrors, $warnings);
     }

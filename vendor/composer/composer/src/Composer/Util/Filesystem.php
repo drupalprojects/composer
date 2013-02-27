@@ -12,6 +12,9 @@
 
 namespace Composer\Util;
 
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
@@ -38,10 +41,23 @@ class Filesystem
         return false;
     }
 
+    /**
+     * Recursively remove a directory
+     *
+     * Uses the process component if proc_open is enabled on the PHP
+     * installation.
+     *
+     * @param  string $directory
+     * @return bool
+     */
     public function removeDirectory($directory)
     {
         if (!is_dir($directory)) {
             return true;
+        }
+
+        if (!function_exists('proc_open')) {
+            return $this->removeDirectoryPhp($directory);
         }
 
         if (defined('PHP_WINDOWS_VERSION_BUILD')) {
@@ -50,12 +66,38 @@ class Filesystem
             $cmd = sprintf('rm -rf %s', escapeshellarg($directory));
         }
 
-        $result = $this->getProcess()->execute($cmd) === 0;
+        $result = $this->getProcess()->execute($cmd, $output) === 0;
 
         // clear stat cache because external processes aren't tracked by the php stat cache
         clearstatcache();
 
         return $result && !is_dir($directory);
+    }
+
+    /**
+     * Recursively delete directory using PHP iterators.
+     *
+     * Uses a CHILD_FIRST RecursiveIteratorIterator to sort files
+     * before directories, creating a single non-recursive loop
+     * to delete files/directories in the correct order.
+     *
+     * @param  string $directory
+     * @return bool
+     */
+    public function removeDirectoryPhp($directory)
+    {
+        $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
+        $ri = new RecursiveIteratorIterator($it, RecursiveIteratorIterator::CHILD_FIRST);
+
+        foreach ($ri as $file) {
+            if ($file->isDir()) {
+                rmdir($file->getPathname());
+            } else {
+                unlink($file->getPathname());
+            }
+        }
+
+        return rmdir($directory);
     }
 
     public function ensureDirectoryExists($directory)
@@ -66,12 +108,42 @@ class Filesystem
                     $directory.' exists and is not a directory.'
                 );
             }
-            if (!mkdir($directory, 0777, true)) {
+            if (!@mkdir($directory, 0777, true)) {
                 throw new \RuntimeException(
                     $directory.' does not exist and could not be created.'
                 );
             }
         }
+    }
+
+    /**
+     * Copy then delete is a non-atomic version of {@link rename}.
+     *
+     * Some systems can't rename and also don't have proc_open,
+     * which requires this solution.
+     *
+     * @param string $source
+     * @param string $target
+     */
+    public function copyThenRemove($source, $target)
+    {
+        $it = new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS);
+        $ri = new RecursiveIteratorIterator($it, RecursiveIteratorIterator::SELF_FIRST);
+
+        if ( !file_exists($target)) {
+            mkdir($target, 0777, true);
+        }
+
+        foreach ($ri as $file) {
+            $targetPath = $target . DIRECTORY_SEPARATOR . $ri->getSubPathName();
+            if ($file->isDir()) {
+                mkdir($targetPath);
+            } else {
+                copy($file->getPathname(), $targetPath);
+            }
+        }
+
+        $this->removeDirectoryPhp($source);
     }
 
     public function rename($source, $target)
@@ -80,10 +152,14 @@ class Filesystem
             return;
         }
 
+        if (!function_exists('proc_open')) {
+            return $this->copyThenRemove($source, $target);
+        }
+
         if (defined('PHP_WINDOWS_VERSION_BUILD')) {
             // Try to copy & delete - this is a workaround for random "Access denied" errors.
             $command = sprintf('xcopy %s %s /E /I /Q', escapeshellarg($source), escapeshellarg($target));
-            if (0 === $this->processExecutor->execute($command)) {
+            if (0 === $this->processExecutor->execute($command, $output)) {
                 $this->remove($source);
 
                 return;
@@ -191,6 +267,40 @@ class Filesystem
     public function isAbsolutePath($path)
     {
         return substr($path, 0, 1) === '/' || substr($path, 1, 1) === ':';
+    }
+
+    /**
+     * Returns size of a file or directory specified by path. If a directory is
+     * given, it's size will be computed recursively.
+     *
+     * @param  string $path Path to the file or directory
+     * @return int
+     */
+    public function size($path)
+    {
+        if (!file_exists($path)) {
+            throw new \RuntimeException("$path does not exist.");
+        }
+        if (is_dir($path)) {
+            return $this->directorySize($path);
+        }
+
+        return filesize($path);
+    }
+
+    protected function directorySize($directory)
+    {
+        $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
+        $ri = new RecursiveIteratorIterator($it, RecursiveIteratorIterator::CHILD_FIRST);
+
+        $size = 0;
+        foreach ($ri as $file) {
+            if ($file->isFile()) {
+                $size += $file->getSize();
+            }
+        }
+
+        return $size;
     }
 
     protected function getProcess()

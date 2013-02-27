@@ -40,8 +40,9 @@ class EventDispatcher
     /**
      * Constructor.
      *
-     * @param Composer    $composer The composer instance
-     * @param IOInterface $io       The IOInterface instance
+     * @param Composer        $composer The composer instance
+     * @param IOInterface     $io       The IOInterface instance
+     * @param ProcessExecutor $process
      */
     public function __construct(Composer $composer, IOInterface $io, ProcessExecutor $process = null)
     {
@@ -51,24 +52,41 @@ class EventDispatcher
     }
 
     /**
+     * Dispatch a script event.
+     *
+     * @param string  $eventName The constant in ScriptEvents
+     * @param Event $event
+     */
+    public function dispatch($eventName, Event $event = null)
+    {
+        if (null == $event) {
+            $event = new Event($eventName, $this->composer, $this->io);
+        }
+
+        $this->doDispatch($event);
+    }
+
+    /**
      * Dispatch a package event.
      *
      * @param string             $eventName The constant in ScriptEvents
+     * @param boolean            $devMode   Whether or not we are in dev mode
      * @param OperationInterface $operation The package being installed/updated/removed
      */
-    public function dispatchPackageEvent($eventName, OperationInterface $operation)
+    public function dispatchPackageEvent($eventName, $devMode, OperationInterface $operation)
     {
-        $this->doDispatch(new PackageEvent($eventName, $this->composer, $this->io, $operation));
+        $this->doDispatch(new PackageEvent($eventName, $this->composer, $this->io, $devMode, $operation));
     }
 
     /**
      * Dispatch a command event.
      *
-     * @param string $eventName The constant in ScriptEvents
+     * @param string  $eventName The constant in ScriptEvents
+     * @param boolean $devMode   Whether or not we are in dev mode
      */
-    public function dispatchCommandEvent($eventName)
+    public function dispatchCommandEvent($eventName, $devMode)
     {
-        $this->doDispatch(new CommandEvent($eventName, $this->composer, $this->io));
+        $this->doDispatch(new CommandEvent($eventName, $this->composer, $this->io, $devMode));
     }
 
     /**
@@ -102,16 +120,9 @@ class EventDispatcher
                     throw $e;
                 }
             } else {
-                $callback = function ($type, $buffer) use ($event, $callable) {
-                    $io = $event->getIO();
-                    if ('err' === $type) {
-                        $message = 'Script %s handling the %s event returned an error: %s';
-                        $io->write(sprintf('<error>'.$message.'</error>', $callable, $event->getName(), $buffer));
-                    } else {
-                        $io->write($buffer, false);
-                    }
-                };
-                $this->process->execute($callable, $callback);
+                if (0 !== $this->process->execute($callable)) {
+                    $event->getIO()->write(sprintf('<error>Script %s handling the %s event returned with an error: %s</error>', $callable, $event->getName(), $this->process->getErrorOutput()));
+                }
             }
         }
     }
@@ -143,10 +154,13 @@ class EventDispatcher
             $this->loader->unregister();
         }
 
-        $generator = new AutoloadGenerator;
-        $packages = $this->composer->getRepositoryManager()->getLocalRepository()->getPackages();
+        $generator = $this->composer->getAutoloadGenerator();
+        $packages = array_merge(
+            $this->composer->getRepositoryManager()->getLocalRepository()->getPackages(),
+            $this->composer->getRepositoryManager()->getLocalDevRepository()->getPackages()
+        );
         $packageMap = $generator->buildPackageMap($this->composer->getInstallationManager(), $package, $packages);
-        $map = $generator->parseAutoloads($packageMap);
+        $map = $generator->parseAutoloads($packageMap, $package);
         $this->loader = $generator->createLoader($map);
         $this->loader->register();
 

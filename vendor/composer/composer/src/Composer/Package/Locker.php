@@ -213,9 +213,11 @@ class Locker
     /**
      * Locks provided data into lockfile.
      *
-     * @param array $packages array of packages
-     * @param mixed $packages array of dev packages or null if installed without --dev
-     * @param array $aliases  array of aliases
+     * @param array  $packages         array of packages
+     * @param mixed  $devPackages      array of dev packages or null if installed without --dev
+     * @param array  $aliases          array of aliases
+     * @param string $minimumStability
+     * @param array  $stabilityFlags
      *
      * @return bool
      */
@@ -285,15 +287,18 @@ class Locker
             $spec = $this->dumper->dump($package);
             unset($spec['version_normalized']);
 
+            // always move time to the end of the package definition
+            $time = isset($spec['time']) ? $spec['time'] : null;
+            unset($spec['time']);
             if ($package->isDev()) {
-                if ('git' === $package->getSourceType() && $path = $this->installationManager->getInstallPath($package)) {
-                    $sourceRef = $package->getSourceReference() ?: $package->getDistReference();
-                    $process = new ProcessExecutor();
-                    if (0 === $process->execute('git log -n1 --pretty=%ct '.escapeshellarg($sourceRef), $output, $path)) {
-                        $spec['time'] = trim($output);
-                    }
-                }
+                // use the exact commit time of the current reference if it's a dev package
+                $time = $this->getPackageTime($package) ?: $time;
             }
+            if (null !== $time) {
+               $spec['time'] = $time;
+            }
+
+            unset($spec['installation-source']);
 
             $locked[] = $spec;
         }
@@ -310,5 +315,43 @@ class Locker
         });
 
         return $locked;
+    }
+
+    /**
+     * Returns the packages's datetime for its source reference.
+     *
+     * @param  PackageInterface $package The package to scan.
+     * @return string|null               The formatted datetime or null if none was found.
+     */
+    private function getPackageTime(PackageInterface $package)
+    {
+        if (!function_exists('proc_open')) {
+            return null;
+        }
+
+        $path = $this->installationManager->getInstallPath($package);
+        $sourceType = $package->getSourceType();
+        $datetime = null;
+
+        if ($path && in_array($sourceType, array('git', 'hg'))) {
+            $sourceRef = $package->getSourceReference() ?: $package->getDistReference();
+            $process = new ProcessExecutor();
+
+            switch ($sourceType) {
+                case 'git':
+                    if (0 === $process->execute('git log -n1 --pretty=%ct '.escapeshellarg($sourceRef), $output, $path) && preg_match('{^\s*\d+\s*$}', $output)) {
+                        $datetime = new \DateTime('@'.trim($output), new \DateTimeZone('UTC'));
+                    }
+                    break;
+
+                case 'hg':
+                    if (0 === $process->execute('hg log --template "{date|hgdate}" -r '.escapeshellarg($sourceRef), $output, $path) && preg_match('{^\s*(\d+)\s*}', $output, $match)) {
+                        $datetime = new \DateTime('@'.$match[1], new \DateTimeZone('UTC'));
+                    }
+                    break;
+            }
+        }
+
+        return $datetime ? $datetime->format('Y-m-d H:i:s') : null;
     }
 }

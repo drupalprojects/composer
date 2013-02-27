@@ -75,8 +75,8 @@ abstract class VcsDownloader implements DownloaderInterface
                 $from = $initial->getSourceReference();
                 $to = $target->getSourceReference();
             } else {
-                $from = substr($initial->getSourceReference(), 0, 6);
-                $to = substr($target->getSourceReference(), 0, 6);
+                $from = substr($initial->getSourceReference(), 0, 7);
+                $to = substr($target->getSourceReference(), 0, 7);
             }
             $name .= ' '.$initial->getPrettyVersion();
         } else {
@@ -128,15 +128,27 @@ abstract class VcsDownloader implements DownloaderInterface
         $this->io->write("  - Removing <info>" . $package->getName() . "</info> (<comment>" . $package->getPrettyVersion() . "</comment>)");
         $this->cleanChanges($path, false);
         if (!$this->filesystem->removeDirectory($path)) {
-            throw new \RuntimeException('Could not completely delete '.$path.', aborting.');
+            // retry after a bit on windows since it tends to be touchy with mass removals
+            if (!defined('PHP_WINDOWS_VERSION_BUILD') || (usleep(250) && !$this->filesystem->removeDirectory($path))) {
+                throw new \RuntimeException('Could not completely delete '.$path.', aborting.');
+            }
         }
+    }
+
+    /**
+     * Download progress information is not available for all VCS downloaders.
+     * {@inheritDoc}
+     */
+    public function setOutputProgress($outputProgress)
+    {
+        return $this;
     }
 
     /**
      * Prompt the user to check if changes should be stashed/removed or the operation aborted
      *
      * @param string $path
-     * @param bool   $stash if true (update) the changes can be stashed and reapplied after an update,
+     * @param bool   $update if true (update) the changes can be stashed and reapplied after an update,
      *                                  if false (remove) the changes should be assumed to be lost if the operation is not aborted
      * @throws \RuntimeException in case the operation must be aborted
      */

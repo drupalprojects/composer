@@ -49,7 +49,8 @@ class PearRepository extends ArrayRepository
             $repoConfig['url'] = 'http://'.$repoConfig['url'];
         }
 
-        if (function_exists('filter_var') && version_compare(PHP_VERSION, '5.3.3', '>=') && !filter_var($repoConfig['url'], FILTER_VALIDATE_URL)) {
+        $urlBits = parse_url($repoConfig['url']);
+        if (empty($urlBits['scheme']) || empty($urlBits['host'])) {
             throw new \UnexpectedValueException('Invalid url given for PEAR repository: '.$repoConfig['url']);
         }
 
@@ -84,6 +85,7 @@ class PearRepository extends ArrayRepository
      * Builds CompletePackages from PEAR package definition data.
      *
      * @param  ChannelInfo     $channelInfo
+     * @param  VersionParser   $versionParser
      * @return CompletePackage
      */
     private function buildComposerPackages(ChannelInfo $channelInfo, VersionParser $versionParser)
@@ -104,7 +106,9 @@ class PearRepository extends ArrayRepository
 
                 // distribution url must be read from /r/{packageName}/{version}.xml::/r/g:text()
                 // but this location is 'de-facto' standard
-                $distUrl = "http://{$packageDefinition->getChannelName()}/get/{$packageDefinition->getPackageName()}-{$version}.tgz";
+                $urlBits = parse_url($this->url);
+                $scheme = (isset($urlBits['scheme']) && 'https' === $urlBits['scheme'] && extension_loaded('openssl')) ? 'https' : 'http';
+                $distUrl = "{$scheme}://{$packageDefinition->getChannelName()}/get/{$packageDefinition->getPackageName()}-{$version}.tgz";
 
                 $requires = array();
                 $suggests = array();

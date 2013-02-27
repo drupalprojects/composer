@@ -97,32 +97,36 @@ Here is a minimal package definition:
 
 It may include any of the other fields specified in the [schema](04-schema.md).
 
-#### notify
+#### notify-batch
 
-The `notify` field allows you to specify an URL template for a URL that will
-be called every time a user installs a package. The URL can be either an
-absolute path (that will use the same domain as the repository) or a fully
-qualified URL.
+The `notify-batch` field allows you to specify an URL that will be called
+every time a user installs a package. The URL can be either an absolute path
+(that will use the same domain as the repository) or a fully qualified URL.
 
 An example value:
 
     {
-        "notify": "/downloads/%package%"
+        "notify-batch": "/downloads/"
     }
 
 For `example.org/packages.json` containing a `monolog/monolog` package, this
-would send a `POST` request to `example.org/downloads/monolog/monolog` with
-following parameters:
+would send a `POST` request to `example.org/downloads/` with following
+JSON request body:
 
-* **version:** The version of the package.
-* **version_normalized:** The normalized internal representation of the
-  version.
+    {
+        "downloads": [
+            {"name": "monolog/monolog", "version": "1.2.1.0"},
+        ]
+    }
+
+The version field will contain the normalized representation of the version
+number.
 
 This field is optional.
 
 #### includes
 
-For large repositories it is possible to split the `packages.json` into
+For larger repositories it is possible to split the `packages.json` into
 multiple files. The `includes` field allows you to reference these additional
 files.
 
@@ -148,11 +152,57 @@ hash changed.
 This field is optional. You probably don't need it for your own custom
 repository.
 
+#### provider-includes and providers-url
+
+For very large repositories like packagist.org using the so-called provider
+files is the preferred method. The `provider-includes` field allows you to
+list a set of files that list package names provided by this repository. The
+hash should be a sha256 of the files in this case.
+
+The `providers-url` describes how provider files are found on the server. It
+is an absolute path from the repository root.
+
+An example:
+
+    {
+        "provider-includes": {
+            "providers-a.json": {
+                "sha256": "f5b4bc0b354108ef08614e569c1ed01a2782e67641744864a74e788982886f4c"
+            },
+            "providers-b.json": {
+                "sha256": "b38372163fac0573053536f5b8ef11b86f804ea8b016d239e706191203f6efac"
+            }
+        },
+        "providers-url": "/p/%package%$%hash%.json"
+    }
+
+Those files contain lists of package names and hashes to verify the file
+integrity, for example:
+
+    {
+        "providers": {
+            "acme/foo": {
+                "sha256": "38968de1305c2e17f4de33aea164515bc787c42c7e2d6e25948539a14268bb82"
+            },
+            "acme/bar": {
+                "sha256": "4dd24c930bd6e1103251306d6336ac813b563a220d9ca14f4743c032fb047233"
+            }
+        }
+    }
+
+The file above declares that acme/foo and acme/bar can be found in this
+repository, by loading the file referenced by `providers-url`, replacing
+`%name%` by the package name and `%hash%` by the sha256 field. Those files
+themselves just contain package definitions as described [above](#packages).
+
+This field is optional. You probably don't need it for your own custom
+repository.
+
 #### stream options
 
 The `packages.json` file is loaded using a PHP stream. You can set extra options
 on that stream using the `options` parameter. You can set any valid PHP stream
-context option. See [Context options and parameters](http://nl3.php.net/manual/en/context.php)
+context option. See [Context options and parameters](http://php.net/manual/en/context.php)
 for more information.
 
 ### VCS
@@ -161,7 +211,7 @@ VCS stands for version control system. This includes versioning systems like
 git, svn or hg. Composer has a repository type for installing packages from
 these systems.
 
-#### Maintaining a third party library fork
+#### Loading a package from a VCS repository
 
 There are a few use cases for this. The most common one is maintaining your
 own fork of a third party library. If you are using a certain library for your
@@ -179,7 +229,7 @@ Example assuming you patched monolog to fix a bug in the `bugfix` branch:
         "repositories": [
             {
                 "type": "vcs",
-                "url": "http://github.com/igorw/monolog"
+                "url": "https://github.com/igorw/monolog"
             }
         ],
         "require": {
@@ -189,6 +239,29 @@ Example assuming you patched monolog to fix a bug in the `bugfix` branch:
 
 When you run `php composer.phar update`, you should get your modified version
 of `monolog/monolog` instead of the one from packagist.
+
+It is possible to inline-alias a package constraint so that it matches a
+constraint that it otherwise would not. For more information [see the
+aliases article](articles/aliases.md).
+
+#### Using private repositories
+
+Exactly the same solution allows you to work with your private repositories at
+GitHub and BitBucket:
+
+    {
+        "require": {
+            "vendor/my-private-repo": "dev-master"
+        },
+        "repositories": [
+            {
+                "type": "vcs",
+                "url":  "git@bitbucket.org:vendor/my-private-repo.git"
+            }
+        ]
+    }
+
+The only requirement is the installation of SSH keys for a git client.
 
 #### Git alternatives
 
@@ -231,6 +304,9 @@ repository like this:
             }
         ]
     }
+
+If you have no branches or tags directory you can disable them entirely by
+setting the `branches-path` or `tags-path` to `false`.
 
 ### PEAR
 

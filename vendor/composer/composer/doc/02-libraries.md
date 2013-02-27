@@ -26,6 +26,28 @@ vendor name. Supplying a vendor name is mandatory.
 username is usually a good bet. While package names are case insensitive, the
 convention is all lowercase and dashes for word separation.
 
+## Platform packages
+
+Composer has platform packages, which are virtual packages for things that are
+installed on the system but are not actually installable by composer. This
+includes PHP itself, PHP extensions and some system libraries.
+
+* `php` represents the PHP version of the user, allowing you to apply
+   constraints, e.g. `>=5.4.0`. To require a 64bit version of php, you can
+   require the `php-64bit` package.
+
+* `ext-<name>` allows you to require PHP extensions (includes core
+  extensions). Versioning can be quite inconsistent here, so it's often
+  a good idea to just set the constraint to `*`.  An example of an extension
+  package name is `ext-gd`.
+
+* `lib-<name>` allows constraints to be made on versions of libraries used by
+  PHP. The following are available: `curl`, `iconv`, `libxml`, `openssl`,
+  `pcre`, `uuid`, `xsl`.
+
+You can use `composer show --platform` to get a list of your locally available
+platform packages.
+
 ## Specifying the version
 
 You need to specify the package's version some way. When you publish your
@@ -94,33 +116,6 @@ on it. It only has an effect on the main project.
 If you do not want to commit the lock file and you are using git, add it to
 the `.gitignore`.
 
-## Light-weight distribution packages
-
-Including the tests and other useless information like .travis.yml in
-distributed packages is not a good idea.
-
-The `.gitattributes` file is a git specific file like `.gitignore` also living
-at the root directory of your library. It overrides local and global
-configuration (`.git/config` and `~/.gitconfig` respectively) when present and
-tracked by git.
-
-Use `.gitattributes` to prevent unwanted files from bloating the zip
-distribution packages.
-
-    // .gitattributes
-    Tests/ export-ignore
-    phpunit.xml.dist export-ignore
-    Resources/doc/ export-ignore
-    .travis.yml export-ignore
-
-Test it by inspecting the zip file generated manually:
-
-    git archive branchName --format zip -o file.zip
-
-> **Note:** Files would be still tracked by git just not included in the
-> distribution. This will only work for GitHub packages installed from
-> dist (i.e. tagged releases) for now.
-
 ## Publishing to a VCS
 
 Once you have a vcs repository (version control system, e.g. git) containing a
@@ -180,10 +175,10 @@ every time is cumbersome. You don't want to force all your users to do that.
 The other thing that you may have noticed is that we did not specify a package
 repository for `monolog/monolog`. How did that work? The answer is packagist.
 
-[Packagist](http://packagist.org/) is the main package repository for
+[Packagist](https://packagist.org/) is the main package repository for
 composer, and it is enabled by default. Anything that is published on
 packagist is available automatically through composer. Since monolog
-[is on packagist](http://packagist.org/packages/monolog/monolog), we can depend
+[is on packagist](https://packagist.org/packages/monolog/monolog), we can depend
 on it without having to specify any additional repositories.
 
 If we wanted to share `hello-world` with the world, we would publish it on

@@ -36,13 +36,17 @@ class GitDriver extends VcsDriver
         if (static::isLocalUrl($this->url)) {
             $this->repoDir = str_replace('file://', '', $this->url);
         } else {
-            $this->repoDir = $this->config->get('home') . '/cache.git/' . preg_replace('{[^a-z0-9.]}i', '-', $this->url) . '/';
+            $this->repoDir = $this->config->get('cache-vcs-dir') . '/' . preg_replace('{[^a-z0-9.]}i', '-', $this->url) . '/';
 
             $fs = new Filesystem();
             $fs->ensureDirectoryExists(dirname($this->repoDir));
 
             if (!is_writable(dirname($this->repoDir))) {
                 throw new \RuntimeException('Can not clone '.$this->url.' to access package information. The "'.dirname($this->repoDir).'" directory is not writable by the current user.');
+            }
+
+            if (preg_match('{^ssh://[^@]+@[^:]+:[^0-9]+}', $this->url)) {
+                throw new \InvalidArgumentException('The source URL '.$this->url.' is invalid, ssh URLs should have a port number after ":".'."\n".'Use ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.');
             }
 
             // update the repo if it is a valid git repository
@@ -140,7 +144,7 @@ class GitDriver extends VcsDriver
 
             if (!isset($composer['time'])) {
                 $this->process->execute(sprintf('git log -1 --format=%%at %s', escapeshellarg($identifier)), $output, $this->repoDir);
-                $date = new \DateTime('@'.trim($output));
+                $date = new \DateTime('@'.trim($output), new \DateTimeZone('UTC'));
                 $composer['time'] = $date->format('Y-m-d H:i:s');
             }
             $this->infoCache[$identifier] = $composer;

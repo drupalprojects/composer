@@ -36,7 +36,9 @@ class UpdateCommand extends Command
                 new InputOption('dev', null, InputOption::VALUE_NONE, 'Enables installation of dev-require packages.'),
                 new InputOption('no-custom-installers', null, InputOption::VALUE_NONE, 'Disables all custom installers.'),
                 new InputOption('no-scripts', null, InputOption::VALUE_NONE, 'Skips the execution of all scripts defined in composer.json file.'),
+                new InputOption('no-progress', null, InputOption::VALUE_NONE, 'Do not output download progress.'),
                 new InputOption('verbose', 'v', InputOption::VALUE_NONE, 'Shows more details including new commits pulled in when updating packages.'),
+                new InputOption('optimize-autoloader', 'o', InputOption::VALUE_NONE, 'Optimize autoloader during autoloader dump')
             ))
             ->setHelp(<<<EOT
 The <info>update</info> command reads the composer.json file from the
@@ -57,6 +59,7 @@ EOT
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $composer = $this->getComposer();
+        $composer->getDownloadManager()->setOutputProgress(!$input->getOption('no-progress'));
         $io = $this->getIO();
         $install = Installer::create($io, $composer);
 
@@ -67,6 +70,7 @@ EOT
             ->setPreferDist($input->getOption('prefer-dist'))
             ->setDevMode($input->getOption('dev'))
             ->setRunScripts(!$input->getOption('no-scripts'))
+            ->setOptimizeAutoloader($input->getOption('optimize-autoloader'))
             ->setUpdate(true)
             ->setUpdateWhitelist($input->getArgument('packages'))
         ;

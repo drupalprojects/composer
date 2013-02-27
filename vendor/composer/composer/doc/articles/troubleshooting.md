@@ -10,7 +10,10 @@ This is a list of common pitfalls on using Composer, and how to avoid them.
 1. When facing any kind of problems using Composer, be sure to **work with the
    latest version**. See [self-update](../03-cli.md#self-update) for details.
 
-2. Ensure you're **installing vendors straight from your `composer.json`** via
+2. Make sure you have no problems with your setup by running the installer's
+   checks via `curl -sS https://getcomposer.org/installer | php -- --check`.
+
+3. Ensure you're **installing vendors straight from your `composer.json`** via
    `rm -rf vendor && composer update -v` when troubleshooting, excluding any
    possible interferences with existing vendor installations or `composer.lock`
    entries.
@@ -24,13 +27,28 @@ This is a list of common pitfalls on using Composer, and how to avoid them.
    [minimum-stability](../04-schema.md#minimum-stability)**. To get started or be
    sure this is no issue, set `minimum-stability` to "dev".
 
-3. Packages **not coming from [Packagist](http://packagist.org/)** should
+3. Packages **not coming from [Packagist](https://packagist.org/)** should
    always be **defined in the root package** (the package depending on all
    vendors).
 
 4. Use the **same vendor and package name** throughout all branches and tags of
    your repository, especially when maintaining a third party fork and using
    `replace`.
+
+## Package not found on travis-ci.org
+
+1. Check the ["Package not found"](#package-not-found) item above.
+
+2. If the package tested is a dependency of one of its dependencies (cyclic
+   dependency), the problem might be that composer is not able to detect the version
+   of the package properly. If it is a git clone it is generally alright and Composer
+   will detect the version of the current branch, but travis does shallow clones so
+   that process can fail when testing pull requests and feature branches in general.
+   The best solution is to define the version you are on via an environment variable
+   called COMPOSER_ROOT_VERSION. You set it to `dev-master` for example to define
+   the root package's version as `dev-master`.
+   Use: `before_script: COMPOSER_ROOT_VERSION=dev-master composer install` to export
+   the variable for the call to composer.
 
 ## Memory limit errors
 
@@ -58,3 +76,9 @@ Or, you can increase the limit with a command-line argument:
 
     php -d memory_limit=-1 composer.phar <...>
 
+## "The system cannot find the path specified" (Windows)
+
+1. Open regedit.
+2. Search for an ```AutoRun``` key inside ```HKEY_LOCAL_MACHINE\Software\Microsoft\Command Processor```
+   or ```HKEY_CURRENT_USER\Software\Microsoft\Command Processor```.
+3. Check if it contains any path to non-existent file, if it's the case, just remove them.

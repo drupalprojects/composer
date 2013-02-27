@@ -36,7 +36,7 @@ class HgDriver extends VcsDriver
         if (static::isLocalUrl($this->url)) {
             $this->repoDir = str_replace('file://', '', $this->url);
         } else {
-            $cacheDir = $this->config->get('home') . '/cache.hg';
+            $cacheDir = $this->config->get('cache-vcs-dir');
             $this->repoDir = $cacheDir . '/' . preg_replace('{[^a-z0-9]}i', '-', $this->url) . '/';
 
             $fs = new Filesystem();
@@ -127,7 +127,7 @@ class HgDriver extends VcsDriver
 
             if (!isset($composer['time'])) {
                 $this->process->execute(sprintf('hg log --template "{date|rfc822date}" -r %s', escapeshellarg($identifier)), $output, $this->repoDir);
-                $date = new \DateTime(trim($output));
+                $date = new \DateTime(trim($output), new \DateTimeZone('UTC'));
                 $composer['time'] = $date->format('Y-m-d H:i:s');
             }
             $this->infoCache[$identifier] = $composer;
@@ -169,7 +169,7 @@ class HgDriver extends VcsDriver
 
             $this->process->execute('hg branches', $output, $this->repoDir);
             foreach ($this->process->splitLines($output) as $branch) {
-                if ($branch && preg_match('(^([^\s]+)\s+\d+:(.*)$)', $branch, $match)) {
+                if ($branch && preg_match('(^([^\s]+)\s+\d+:([a-f0-9]+))', $branch, $match)) {
                     $branches[$match[1]] = $match[2];
                 }
             }

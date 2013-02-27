@@ -97,7 +97,7 @@ interface PackageInterface
     /**
      * Returns source from which this package was installed (source/dist).
      *
-     * @param string $type source/dist
+     * @return string source/dist
      */
     public function getInstallationSource();
 
@@ -287,6 +287,13 @@ interface PackageInterface
      * @return string
      */
     public function getUniqueName();
+
+    /**
+     * Returns the package notification url
+     *
+     * @return string
+     */
+    public function getNotificationUrl();
 
     /**
      * Converts the package into a readable and unique string

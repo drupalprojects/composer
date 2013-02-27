@@ -50,7 +50,7 @@ class GitHubDriver extends VcsDriver
         $this->owner = $match[1];
         $this->repository = $match[2];
         $this->originUrl = 'github.com';
-        $this->cache = new Cache($this->io, $this->config->get('home').'/cache.github/'.$this->owner.'/'.$this->repository);
+        $this->cache = new Cache($this->io, $this->config->get('cache-repo-dir').'/'.$this->originUrl.'/'.$this->owner.'/'.$this->repository);
 
         $this->fetchRootIdentifier();
     }
@@ -76,7 +76,7 @@ class GitHubDriver extends VcsDriver
             return $this->gitDriver->getUrl();
         }
 
-        return $this->url;
+        return 'https://github.com/'.$this->owner.'/'.$this->repository.'.git';
     }
 
     /**
@@ -108,7 +108,7 @@ class GitHubDriver extends VcsDriver
             return $this->gitDriver->getDist($identifier);
         }
         $label = array_search($identifier, $this->getTags()) ?: $identifier;
-        $url = 'https://github.com/'.$this->owner.'/'.$this->repository.'/zipball/'.$label;
+        $url = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/zipball/'.$label;
 
         return array('type' => 'zip', 'url' => $url, 'reference' => $label, 'shasum' => '');
     }
@@ -128,8 +128,11 @@ class GitHubDriver extends VcsDriver
 
         if (!isset($this->infoCache[$identifier])) {
             try {
-                $resource = 'https://raw.github.com/'.$this->owner.'/'.$this->repository.'/'.urlencode($identifier).'/composer.json';
-                $composer = $this->getContents($resource);
+                $resource = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/contents/composer.json?ref='.urlencode($identifier);
+                $composer = JsonFile::parseJson($this->getContents($resource));
+                if (empty($composer['content']) || $composer['encoding'] !== 'base64' || !($composer = base64_decode($composer['content']))) {
+                    throw new \RuntimeException('Could not retrieve composer.json from '.$resource);
+                }
             } catch (TransportException $e) {
                 if (404 !== $e->getCode()) {
                     throw $e;
@@ -267,7 +270,7 @@ class GitHubDriver extends VcsDriver
                     return parent::getContents($url);
 
                 case 403:
-                    if (!$this->io->hasAuthorization($this->originUrl) && $gitHubUtil->authorizeOAuth($this->originUrl)) {
+                    if (!$this->io->hasAuthentication($this->originUrl) && $gitHubUtil->authorizeOAuth($this->originUrl)) {
                         return parent::getContents($url);
                     }
 
@@ -282,7 +285,7 @@ class GitHubDriver extends VcsDriver
                         }
                     }
 
-                    if (!$this->io->hasAuthorization($this->originUrl)) {
+                    if (!$this->io->hasAuthentication($this->originUrl)) {
                         if (!$this->io->isInteractive()) {
                             $this->io->write('<error>GitHub API limit exhausted. Failed to get metadata for the '.$this->url.' repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>');
                             throw $e;

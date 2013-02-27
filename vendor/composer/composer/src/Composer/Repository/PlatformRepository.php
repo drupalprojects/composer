@@ -30,13 +30,19 @@ class PlatformRepository extends ArrayRepository
             $prettyVersion = PHP_VERSION;
             $version = $versionParser->normalize($prettyVersion);
         } catch (\UnexpectedValueException $e) {
-            $prettyVersion = preg_replace('#^(.+?)(-.+)?$#', '$1', PHP_VERSION);
+            $prettyVersion = preg_replace('#^([^~+-]+).*$#', '$1', PHP_VERSION);
             $version = $versionParser->normalize($prettyVersion);
         }
 
         $php = new CompletePackage('php', $version, $prettyVersion);
         $php->setDescription('The PHP interpreter');
         parent::addPackage($php);
+
+        if (PHP_INT_SIZE === 8) {
+            $php64 = new CompletePackage('php-64bit', $version, $prettyVersion);
+            $php64->setDescription('The PHP interpreter (64bit)');
+            parent::addPackage($php64);
+        }
 
         $loadedExtensions = get_loaded_extensions();
 
@@ -64,6 +70,7 @@ class PlatformRepository extends ArrayRepository
         // Doing it this way to know that functions or constants exist before
         // relying on them.
         foreach ($loadedExtensions as $name) {
+            $prettyVersion = null;
             switch ($name) {
                 case 'curl':
                     $curlVersion = curl_version();
@@ -72,6 +79,23 @@ class PlatformRepository extends ArrayRepository
 
                 case 'iconv':
                     $prettyVersion = ICONV_VERSION;
+                    break;
+
+                case 'intl':
+                    $name = 'ICU';
+                    if (defined('INTL_ICU_VERSION')) {
+                        $prettyVersion = INTL_ICU_VERSION;
+                    } else {
+                        $reflector = new \ReflectionExtension('intl');
+
+                        ob_start();
+                        $reflector->info();
+                        $output = ob_get_clean();
+
+                        preg_match('/^ICU version => (.*)$/m', $output, $matches);
+                        $prettyVersion = $matches[1];
+                    }
+
                     break;
 
                 case 'libxml':

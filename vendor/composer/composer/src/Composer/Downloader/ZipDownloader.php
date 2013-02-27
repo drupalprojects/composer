@@ -13,6 +13,7 @@
 namespace Composer\Downloader;
 
 use Composer\Config;
+use Composer\Cache;
 use Composer\Util\ProcessExecutor;
 use Composer\IO\IOInterface;
 use ZipArchive;
@@ -24,26 +25,41 @@ class ZipDownloader extends ArchiveDownloader
 {
     protected $process;
 
-    public function __construct(IOInterface $io, Config $config, ProcessExecutor $process = null)
+    public function __construct(IOInterface $io, Config $config, Cache $cache = null, ProcessExecutor $process = null)
     {
         $this->process = $process ?: new ProcessExecutor;
-        parent::__construct($io, $config);
+        parent::__construct($io, $config, $cache);
     }
 
     protected function extract($file, $path)
     {
+        $processError = null;
+
+        // try to use unzip on *nix
+        if (!defined('PHP_WINDOWS_VERSION_BUILD')) {
+            $command = 'unzip '.escapeshellarg($file).' -d '.escapeshellarg($path);
+            if (0 === $this->process->execute($command, $ignoredOutput)) {
+                return;
+            }
+
+            $processError = 'Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput();
+        }
+
         if (!class_exists('ZipArchive')) {
-            $error = 'You need the zip extension enabled to use the ZipDownloader';
+            // php.ini path is added to the error message to help users find the correct file
+            $iniPath = php_ini_loaded_file();
 
-            // try to use unzip on *nix
+            if ($iniPath) {
+                $iniMessage = 'The php.ini used by your command-line PHP is: ' . $iniPath;
+            } else {
+                $iniMessage = 'A php.ini file does not exist. You will have to create one.';
+            }
+
+            $error = "Could not decompress the archive, enable the PHP zip extension or install unzip.\n"
+                . $iniMessage . "\n" . $processError;
+
             if (!defined('PHP_WINDOWS_VERSION_BUILD')) {
-                $command = 'unzip '.escapeshellarg($file).' -d '.escapeshellarg($path);
-                if (0 === $this->process->execute($command, $ignoredOutput)) {
-                    return;
-                }
-
-                $error = "Could not decompress the archive, enable the PHP zip extension or install unzip.\n".
-                    'Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput();
+                $error = "Could not decompress the archive, enable the PHP zip extension.\n" . $iniMessage;
             }
 
             throw new \RuntimeException($error);

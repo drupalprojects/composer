@@ -18,13 +18,13 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Formatter\OutputFormatter;
-use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 use Composer\Command;
 use Composer\Command\Helper\DialogHelper;
 use Composer\Composer;
 use Composer\Factory;
 use Composer\IO\IOInterface;
 use Composer\IO\ConsoleIO;
+use Composer\Json\JsonValidationException;
 use Composer\Util\ErrorHandler;
 
 /**
@@ -46,14 +46,26 @@ class Application extends BaseApplication
      */
     protected $io;
 
+    private static $logo = '   ______
+  / ____/___  ____ ___  ____  ____  ________  _____
+ / /   / __ \/ __ `__ \/ __ \/ __ \/ ___/ _ \/ ___/
+/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /
+\____/\____/_/ /_/ /_/ .___/\____/____/\___/_/
+                    /_/
+';
+
     public function __construct()
     {
-        ErrorHandler::register();
         if (function_exists('ini_set')) {
             ini_set('xdebug.show_exception_trace', false);
             ini_set('xdebug.scream', false);
+
+        }
+        if (function_exists('date_default_timezone_set') && function_exists('date_default_timezone_get')) {
+            date_default_timezone_set(@date_default_timezone_get());
         }
 
+        ErrorHandler::register();
         parent::__construct('Composer', Composer::VERSION);
     }
 
@@ -63,8 +75,7 @@ class Application extends BaseApplication
     public function run(InputInterface $input = null, OutputInterface $output = null)
     {
         if (null === $output) {
-            $styles['highlight'] = new OutputFormatterStyle('red');
-            $styles['warning'] = new OutputFormatterStyle('black', 'yellow');
+            $styles = Factory::createAdditionalStyles();
             $formatter = new OutputFormatter(null, $styles);
             $output = new ConsoleOutput(ConsoleOutput::VERBOSITY_NORMAL, null, $formatter);
         }
@@ -85,7 +96,7 @@ class Application extends BaseApplication
 
         if (defined('COMPOSER_DEV_WARNING_TIME') && $this->getCommandName($input) !== 'self-update') {
             if (time() > COMPOSER_DEV_WARNING_TIME) {
-                $output->writeln(sprintf('<warning>This dev build of composer is outdated, please run "%s self-update" to get the latest version.</warning>', $_SERVER['PHP_SELF']));
+                $output->writeln(sprintf('<warning>Warning: This development build of composer is over 30 days old. It is recommended to update it by running "%s self-update" to get the latest version.</warning>', $_SERVER['PHP_SELF']));
             }
         }
 
@@ -134,7 +145,12 @@ class Application extends BaseApplication
                     $this->io->write($e->getMessage());
                     exit(1);
                 }
+            } catch (JsonValidationException $e) {
+                $errors = ' - ' . implode(PHP_EOL . ' - ', $e->getErrors());
+                $message = $e->getMessage() . ':' . PHP_EOL . $errors;
+                throw new JsonValidationException($message);
             }
+
         }
 
         return $this->composer;
@@ -146,6 +162,11 @@ class Application extends BaseApplication
     public function getIO()
     {
         return $this->io;
+    }
+
+    public function getHelp()
+    {
+        return self::$logo . parent::getHelp();
     }
 
     /**

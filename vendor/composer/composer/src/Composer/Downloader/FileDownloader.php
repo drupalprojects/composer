@@ -13,6 +13,7 @@
 namespace Composer\Downloader;
 
 use Composer\Config;
+use Composer\Cache;
 use Composer\IO\IOInterface;
 use Composer\Package\PackageInterface;
 use Composer\Package\Version\VersionParser;
@@ -29,22 +30,35 @@ use Composer\Util\RemoteFilesystem;
  */
 class FileDownloader implements DownloaderInterface
 {
+    private static $cacheCollected = false;
     protected $io;
     protected $config;
     protected $rfs;
     protected $filesystem;
+    protected $cache;
+    protected $outputProgress = true;
 
     /**
      * Constructor.
      *
-     * @param IOInterface $io The IO instance
+     * @param IOInterface      $io         The IO instance
+     * @param Config           $config     The config
+     * @param Cache            $cache      Optional cache instance
+     * @param RemoteFilesystem $rfs        The remote filesystem
+     * @param Filesystem       $filesystem The filesystem
      */
-    public function __construct(IOInterface $io, Config $config, RemoteFilesystem $rfs = null, Filesystem $filesystem = null)
+    public function __construct(IOInterface $io, Config $config, Cache $cache = null, RemoteFilesystem $rfs = null, Filesystem $filesystem = null)
     {
         $this->io = $io;
         $this->config = $config;
         $this->rfs = $rfs ?: new RemoteFilesystem($io);
         $this->filesystem = $filesystem ?: new Filesystem();
+        $this->cache = $cache;
+
+        if ($this->cache && !self::$cacheCollected && !mt_rand(0, 50)) {
+            $this->cache->gc($config->get('cache-ttl'), $config->get('cache-files-maxsize'));
+        }
+        self::$cacheCollected = true;
     }
 
     /**
@@ -71,21 +85,36 @@ class FileDownloader implements DownloaderInterface
 
         $this->io->write("  - Installing <info>" . $package->getName() . "</info> (<comment>" . VersionParser::formatVersion($package) . "</comment>)");
 
-        $processUrl = $this->processUrl($package, $url);
+        $processedUrl = $this->processUrl($package, $url);
+        $hostname = parse_url($processedUrl, PHP_URL_HOST);
+
+        if (strpos($hostname, '.github.com') === (strlen($hostname) - 11)) {
+            $hostname = 'github.com';
+        }
 
         try {
             try {
-                $this->rfs->copy(parse_url($processUrl, PHP_URL_HOST), $processUrl, $fileName);
+                if (!$this->cache || !$this->cache->copyTo($this->getCacheKey($package), $fileName)) {
+                    $this->rfs->copy($hostname, $processedUrl, $fileName, $this->outputProgress);
+                    if (!$this->outputProgress) {
+                        $this->io->write('    Downloading');
+                    }
+                    if ($this->cache) {
+                        $this->cache->copyFrom($this->getCacheKey($package), $fileName);
+                    }
+                } else {
+                    $this->io->write('    Loading from cache');
+                }
             } catch (TransportException $e) {
-                if (404 === $e->getCode() && 'github.com' === parse_url($processUrl, PHP_URL_HOST)) {
-                    $message = "\n".'Could not fetch '.$processUrl.', enter your GitHub credentials to access private repos';
+                if (in_array($e->getCode(), array(404, 403)) && 'github.com' === $hostname && !$this->io->hasAuthentication($hostname)) {
+                    $message = "\n".'Could not fetch '.$processedUrl.', enter your GitHub credentials '.($e->getCode() === 404 ? 'to access private repos' : 'to go over the API rate limit');
                     $gitHubUtil = new GitHub($this->io, $this->config, null, $this->rfs);
-                    if (!$gitHubUtil->authorizeOAuth('github.com')
-                        && (!$this->io->isInteractive() || !$gitHubUtil->authorizeOAuthInteractively('github.com', $message))
+                    if (!$gitHubUtil->authorizeOAuth($hostname)
+                        && (!$this->io->isInteractive() || !$gitHubUtil->authorizeOAuthInteractively($hostname, $message))
                     ) {
                         throw $e;
                     }
-                    $this->rfs->copy(parse_url($processUrl, PHP_URL_HOST), $processUrl, $fileName);
+                    $this->rfs->copy($hostname, $processedUrl, $fileName, $this->outputProgress);
                 } else {
                     throw $e;
                 }
@@ -103,7 +132,26 @@ class FileDownloader implements DownloaderInterface
         } catch (\Exception $e) {
             // clean up
             $this->filesystem->removeDirectory($path);
+            $this->clearCache($package, $path);
             throw $e;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function setOutputProgress($outputProgress)
+    {
+        $this->outputProgress = $outputProgress;
+
+        return $this;
+    }
+
+    protected function clearCache(PackageInterface $package, $path)
+    {
+        if ($this->cache) {
+            $fileName = $this->getFileName($package, $path);
+            $this->cache->remove($this->getCacheKey($package));
         }
     }
 
@@ -123,7 +171,10 @@ class FileDownloader implements DownloaderInterface
     {
         $this->io->write("  - Removing <info>" . $package->getName() . "</info> (<comment>" . VersionParser::formatVersion($package) . "</comment>)");
         if (!$this->filesystem->removeDirectory($path)) {
-            throw new \RuntimeException('Could not completely delete '.$path.', aborting.');
+            // retry after a bit on windows since it tends to be touchy with mass removals
+            if (!defined('PHP_WINDOWS_VERSION_BUILD') || (usleep(250) && !$this->filesystem->removeDirectory($path))) {
+                throw new \RuntimeException('Could not completely delete '.$path.', aborting.');
+            }
         }
     }
 
@@ -155,5 +206,14 @@ class FileDownloader implements DownloaderInterface
         }
 
         return $url;
+    }
+
+    private function getCacheKey(PackageInterface $package)
+    {
+        if (preg_match('{^[a-f0-9]{40}$}', $package->getDistReference())) {
+            return $package->getName().'/'.$package->getDistReference().'.'.$package->getDistType();
+        }
+
+        return $package->getName().'/'.$package->getVersion().'-'.$package->getDistReference().'.'.$package->getDistType();
     }
 }

@@ -35,7 +35,8 @@ class RemoteFilesystem
     /**
      * Constructor.
      *
-     * @param IOInterface $io The IO instance
+     * @param IOInterface $io      The IO instance
+     * @param array       $options The options
      */
     public function __construct(IOInterface $io, $options = array())
     {
@@ -100,6 +101,10 @@ class RemoteFilesystem
         $this->lastProgress = null;
 
         $options = $this->getOptionsForUrl($originUrl, $additionalOptions);
+        if (isset($options['github-token'])) {
+            $fileUrl .= (false === strpos($fileUrl, '?') ? '?' : '&') . 'access_token='.$options['github-token'];
+            unset($options['github-token']);
+        }
         $ctx = StreamContextFactory::getContext($options, array('notification' => array($this, 'callbackGet')));
 
         if ($this->progress) {
@@ -220,7 +225,7 @@ class RemoteFilesystem
                     $this->io->overwrite('    Authentication required (<info>'.parse_url($this->fileUrl, PHP_URL_HOST).'</info>):');
                     $username = $this->io->ask('      Username: ');
                     $password = $this->io->askAndHideAnswer('      Password: ');
-                    $this->io->setAuthorization($this->originUrl, $username, $password);
+                    $this->io->setAuthentication($this->originUrl, $username, $password);
 
                     $this->get($this->originUrl, $this->fileUrl, $this->fileName, $this->progress);
                 }
@@ -228,6 +233,8 @@ class RemoteFilesystem
 
             case STREAM_NOTIFY_AUTH_RESULT:
                 if (403 === $messageCode) {
+                    $message = "The '" . $this->fileUrl . "' URL could not be accessed: " . $message;
+
                     throw new TransportException($message, 403);
                 }
                 break;
@@ -276,13 +283,17 @@ class RemoteFilesystem
             $headers[] = 'Accept-Encoding: gzip';
         }
 
-        if ($this->io->hasAuthorization($originUrl)) {
-            $auth = $this->io->getAuthorization($originUrl);
-            $authStr = base64_encode($auth['username'] . ':' . $auth['password']);
-            $headers[] = 'Authorization: Basic '.$authStr;
-        }
-
         $options = array_replace_recursive($this->options, $additionalOptions);
+
+        if ($this->io->hasAuthentication($originUrl)) {
+            $auth = $this->io->getAuthentication($originUrl);
+            if ('github.com' === $originUrl && 'x-oauth-basic' === $auth['password']) {
+                $options['github-token'] = $auth['username'];
+            } else {
+                $authStr = base64_encode($auth['username'] . ':' . $auth['password']);
+                $headers[] = 'Authorization: Basic '.$authStr;
+            }
+        }
 
         if (isset($options['http']['header']) && !is_array($options['http']['header'])) {
             $options['http']['header'] = explode("\r\n", trim($options['http']['header'], "\r\n"));

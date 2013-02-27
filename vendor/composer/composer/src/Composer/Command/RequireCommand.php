@@ -37,6 +37,7 @@ class RequireCommand extends InitCommand
                 new InputOption('dev', null, InputOption::VALUE_NONE, 'Add requirement to require-dev.'),
                 new InputOption('prefer-source', null, InputOption::VALUE_NONE, 'Forces installation from package sources when possible, including VCS information.'),
                 new InputOption('prefer-dist', null, InputOption::VALUE_NONE, 'Forces installation from package dist even for dev versions.'),
+                new InputOption('no-progress', null, InputOption::VALUE_NONE, 'Do not output download progress.'),
                 new InputOption('no-update', null, InputOption::VALUE_NONE, 'Disables the automatic update of the dependencies.'),
             ))
             ->setHelp(<<<EOT
@@ -51,11 +52,10 @@ EOT
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $factory = new Factory;
-        $file = $factory->getComposerFile();
+        $file = Factory::getComposerFile();
 
-        if (!file_exists($file)) {
-            $output->writeln('<error>'.$file.' not found.</error>');
+        if (!file_exists($file) && !file_put_contents($file, "{\n}\n")) {
+            $output->writeln('<error>'.$file.' could not be created.</error>');
 
             return 1;
         }
@@ -64,11 +64,17 @@ EOT
 
             return 1;
         }
+        if (!is_writable($file)) {
+            $output->writeln('<error>'.$file.' is not writable.</error>');
+
+            return 1;
+        }
 
         $dialog = $this->getHelperSet()->get('dialog');
 
         $json = new JsonFile($file);
         $composer = $json->read();
+        $composerBackup = file_get_contents($json->getPath());
 
         $requirements = $this->determineRequirements($input, $output, $input->getArgument('packages'));
 
@@ -93,6 +99,7 @@ EOT
 
         // Update packages
         $composer = $this->getComposer();
+        $composer->getDownloadManager()->setOutputProgress(!$input->getOption('no-progress'));
         $io = $this->getIO();
         $install = Installer::create($io, $composer);
 
@@ -105,7 +112,14 @@ EOT
             ->setUpdateWhitelist($requirements);
         ;
 
-        return $install->run() ? 0 : 1;
+        if (!$install->run()) {
+            $output->writeln("\n".'<error>Installation failed, reverting '.$file.' to its original content.</error>');
+            file_put_contents($json->getPath(), $composerBackup);
+
+            return 1;
+        }
+
+        return 0;
     }
 
     private function updateFileCleanly($json, array $base, array $new, $requireKey)

@@ -30,6 +30,8 @@ Composer fires the following named events during its execution process:
 - **post-package-update**: occurs after a package is updated.
 - **pre-package-uninstall**: occurs before a package has been uninstalled.
 - **post-package-uninstall**: occurs after a package has been uninstalled.
+- **post-autoload-dump**: occurs after the autoloader is dumped, either
+  during `install`/`update`, or via the `dump-autoload` command.
 
 
 ## Defining scripts
@@ -54,7 +56,7 @@ Script definition example:
             "post-update-cmd": "MyVendor\\MyClass::postUpdate",
             "post-package-install": [
                 "MyVendor\\MyClass::postPackageInstall"
-            ]
+            ],
             "post-install-cmd": [
                 "MyVendor\\MyClass::warmCache",
                 "phpunit -c app/"

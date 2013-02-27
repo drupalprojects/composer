@@ -16,6 +16,7 @@ use Composer\Package\BasePackage;
 use Composer\Package\PackageInterface;
 use Composer\Package\CompletePackageInterface;
 use Composer\Package\RootPackageInterface;
+use Composer\Package\Link;
 
 /**
  * @author Konstantin Kudryashiv <ever.zet@gmail.com>
@@ -31,6 +32,7 @@ class ArrayDumper
             'extra',
             'installationSource' => 'installation-source',
             'autoload',
+            'notificationUrl' => 'notification-url',
             'includePaths' => 'include-path',
         );
 
@@ -61,10 +63,12 @@ class ArrayDumper
                 foreach ($links as $link) {
                     $data[$type][$link->getTarget()] = $link->getPrettyConstraint();
                 }
+                ksort($data[$type]);
             }
         }
 
         if ($packages = $package->getSuggests()) {
+            ksort($packages);
             $data['suggest'] = $packages;
         }
 
@@ -87,6 +91,10 @@ class ArrayDumper
             );
 
             $data = $this->dumpValues($package, $keys, $data);
+
+            if (isset($data['keywords']) && is_array($data['keywords'])) {
+                sort($data['keywords']);
+            }
         }
 
         if ($package instanceof RootPackageInterface) {

@@ -32,42 +32,40 @@ abstract class ArchiveDownloader extends FileDownloader
 
         $fileName = $this->getFileName($package, $path);
         if ($this->io->isVerbose()) {
-            $this->io->write('    Unpacking archive');
+            $this->io->write('    Extracting archive');
         }
-        try {
-            $this->extract($fileName, $path);
 
-            if ($this->io->isVerbose()) {
-                $this->io->write('    Cleaning up');
+        $temporaryDir = sys_get_temp_dir().'/cmp'.substr(md5(time().mt_rand()), 0, 5);
+        try {
+            $this->filesystem->ensureDirectoryExists($temporaryDir);
+            try {
+                $this->extract($fileName, $temporaryDir);
+            } catch (\Exception $e) {
+                // remove cache if the file was corrupted
+                parent::clearCache($package, $path);
+                throw $e;
             }
+
             unlink($fileName);
 
-            // If we have only a one dir inside it suppose to be a package itself
-            $contentDir = glob($path . '/*');
-            if (1 === count($contentDir)) {
-                $contentDir = $contentDir[0];
+            // get file list
+            $contentDir = $this->listFiles($temporaryDir);
 
-                if (is_file($contentDir)) {
-                    $this->filesystem->rename($contentDir, $path . '/' . basename($contentDir));
-                } else {
-                    // Rename the content directory to avoid error when moving up
-                    // a child folder with the same name
-                    $temporaryDir = sys_get_temp_dir().'/'.md5(time().rand());
-                    $this->filesystem->rename($contentDir, $temporaryDir);
-                    $contentDir = $temporaryDir;
-
-                    foreach (array_merge(glob($contentDir . '/.*'), glob($contentDir . '/*')) as $file) {
-                        if (trim(basename($file), '.')) {
-                            $this->filesystem->rename($file, $path . '/' . basename($file));
-                        }
-                    }
-
-                    $this->filesystem->removeDirectory($contentDir);
-                }
+            // only one dir in the archive, extract its contents out of it
+            if (1 === count($contentDir) && !is_file($contentDir[0])) {
+                $contentDir = $this->listFiles($contentDir[0]);
             }
+
+            // move files back out of the temp dir
+            foreach ($contentDir as $file) {
+                $this->filesystem->rename($file, $path . '/' . basename($file));
+            }
+
+            $this->filesystem->removeDirectory($temporaryDir);
         } catch (\Exception $e) {
             // clean up
             $this->filesystem->removeDirectory($path);
+            $this->filesystem->removeDirectory($temporaryDir);
             throw $e;
         }
 
@@ -87,14 +85,27 @@ abstract class ArchiveDownloader extends FileDownloader
      */
     protected function processUrl(PackageInterface $package, $url)
     {
-        if ($package->getDistReference() && preg_match('{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i', $url, $match)) {
-            $url = 'https://github.com/' . $match[1] . '/'. $match[2] . '/' . $match[3] . 'ball/' . $package->getDistReference();
+        if ($package->getDistReference() && strpos($url, 'github.com')) {
+            if (preg_match('{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i', $url, $match)) {
+                // update legacy github archives to API calls with the proper reference
+                $url = 'https://api.github.com/repos/' . $match[1] . '/'. $match[2] . '/' . $match[3] . 'ball/' . $package->getDistReference();
+            } elseif ($package->getDistReference() && preg_match('{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i', $url, $match)) {
+                // update current github web archives to API calls with the proper reference
+                $url = 'https://api.github.com/repos/' . $match[1] . '/'. $match[2] . '/' . $match[3] . 'ball/' . $package->getDistReference();
+            } elseif ($package->getDistReference() && preg_match('{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i', $url, $match)) {
+                // update api archives to the proper reference
+                $url = 'https://api.github.com/repos/' . $match[1] . '/'. $match[2] . '/' . $match[3] . 'ball/' . $package->getDistReference();
+            }
         }
 
         if (!extension_loaded('openssl') && (0 === strpos($url, 'https:') || 0 === strpos($url, 'http://github.com'))) {
             // bypass https for github if openssl is disabled
-            if (preg_match('{^https?://(github.com/[^/]+/[^/]+/(zip|tar)ball/[^/]+)$}i', $url, $match)) {
-                $url = 'http://nodeload.'.$match[1];
+            if (preg_match('{^https://api\.github\.com/repos/([^/]+/[^/]+)/(zip|tar)ball/([^/]+)$}i', $url, $match)) {
+                $url = 'http://nodeload.github.com/'.$match[1].'/'.$match[2].'/'.$match[3];
+            } elseif (preg_match('{^https://github\.com/([^/]+/[^/]+)/(zip|tar)ball/([^/]+)$}i', $url, $match)) {
+                $url = 'http://nodeload.github.com/'.$match[1].'/'.$match[2].'/'.$match[3];
+            } elseif (preg_match('{^https://github\.com/([^/]+/[^/]+)/archive/([^/]+)\.(zip|tar\.gz)$}i', $url, $match)) {
+                $url = 'http://nodeload.github.com/'.$match[1].'/'.$match[3].'/'.$match[2];
             } else {
                 throw new \RuntimeException('You must enable the openssl extension to download files via https');
             }
@@ -112,4 +123,16 @@ abstract class ArchiveDownloader extends FileDownloader
      * @throws \UnexpectedValueException If can not extract downloaded file to path
      */
     abstract protected function extract($file, $path);
+
+    /**
+     * Returns the list of files in a directory including dotfiles
+     */
+    private function listFiles($dir)
+    {
+        $files = array_merge(glob($dir . '/.*'), glob($dir . '/*'));
+
+        return array_values(array_filter($files, function ($el) {
+            return basename($el) !== '.' && basename($el) !== '..';
+        }));
+    }
 }

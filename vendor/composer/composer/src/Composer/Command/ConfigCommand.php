@@ -28,6 +28,11 @@ use Composer\Json\JsonFile;
 class ConfigCommand extends Command
 {
     /**
+     * @var Config
+     */
+    protected $config;
+
+    /**
      * @var Composer\Json\JsonFile
      */
     protected $configFile;
@@ -97,10 +102,12 @@ EOT
             throw new \RuntimeException('--file and --global can not be combined');
         }
 
+        $this->config = Factory::createConfig();
+
         // Get the local composer.json, global config.json, or if the user
         // passed in a file to use
         $configFile = $input->getOption('global')
-            ? (Factory::createConfig()->get('home') . '/config.json')
+            ? ($this->config->get('home') . '/config.json')
             : $input->getOption('file');
 
         $this->configFile = new JsonFile($configFile);
@@ -144,14 +151,19 @@ EOT
             return 0;
         }
 
+        if (!$input->getOption('global')) {
+            $this->config->merge($this->configFile->read());
+        }
+
         // List the configuration of the file settings
         if ($input->getOption('list')) {
-            $this->listConfiguration($this->configFile->read(), $output);
+            $this->listConfiguration($this->config->all(), $this->config->raw(), $output);
 
             return 0;
         }
 
-        if (!$input->getArgument('setting-key')) {
+        $settingKey = $input->getArgument('setting-key');
+        if (!$settingKey) {
             return 0;
         }
 
@@ -159,14 +171,56 @@ EOT
         if (array() !== $input->getArgument('setting-value') && $input->getOption('unset')) {
             throw new \RuntimeException('You can not combine a setting value with --unset');
         }
+
+        // show the value if no value is provided
         if (array() === $input->getArgument('setting-value') && !$input->getOption('unset')) {
-            throw new \RuntimeException('You must include a setting value or pass --unset to clear the value');
+            $data = $this->config->all();
+            if (preg_match('/^repos?(?:itories)?(?:\.(.+))?/', $settingKey, $matches)) {
+                if (empty($matches[1])) {
+                    $value = isset($data['repositories']) ? $data['repositories'] : array();
+                } else {
+                    if (!isset($data['repositories'][$matches[1]])) {
+                        throw new \InvalidArgumentException('There is no '.$matches[1].' repository defined');
+                    }
+
+                    $value = $data['repositories'][$matches[1]];
+                }
+            } elseif (strpos($settingKey, '.')) {
+                $bits = explode('.', $settingKey);
+                $data = $data['config'];
+                foreach ($bits as $bit) {
+                    if (isset($data[$bit])) {
+                        $data = $data[$bit];
+                    } elseif (isset($data[implode('.', $bits)])) {
+                        // last bit can contain domain names and such so try to join whatever is left if it exists
+                        $data = $data[implode('.', $bits)];
+                        break;
+                    } else {
+                        throw new \RuntimeException($settingKey.' is not defined');
+                    }
+                    array_shift($bits);
+                }
+
+                $value = $data;
+            } elseif (isset($data['config'][$settingKey])) {
+                $value = $data['config'][$settingKey];
+            } else {
+                throw new \RuntimeException($settingKey.' is not defined');
+            }
+
+            if (is_array($value)) {
+                $value = json_encode($value);
+            }
+
+            $output->writeln($value);
+
+            return 0;
         }
 
         $values = $input->getArgument('setting-value'); // what the user is trying to add/change
 
         // handle repositories
-        if (preg_match('/^repos?(?:itories)?\.(.+)/', $input->getArgument('setting-key'), $matches)) {
+        if (preg_match('/^repos?(?:itories)?\.(.+)/', $settingKey, $matches)) {
             if ($input->getOption('unset')) {
                 return $this->configSource->removeRepository($matches[1]);
             }
@@ -181,14 +235,41 @@ EOT
             ));
         }
 
+        // handle github-oauth
+        if (preg_match('/^github-oauth\.(.+)/', $settingKey, $matches)) {
+            if ($input->getOption('unset')) {
+                return $this->configSource->removeConfigSetting('github-oauth.'.$matches[1]);
+            }
+
+            if (1 !== count($values)) {
+                throw new \RuntimeException('Too many arguments, expected only one token');
+            }
+
+            return $this->configSource->addConfigSetting('github-oauth.'.$matches[1], $values[0]);
+        }
+
         // handle config values
         $uniqueConfigValues = array(
             'process-timeout' => array('is_numeric', 'intval'),
-            'vendor-dir' => array('is_string', function ($val) { return $val; }),
-            'bin-dir' => array('is_string', function ($val) { return $val; }),
+            'use-include-path' => array(
+                function ($val) { return true; },
+                function ($val) { return $val !== 'false' && (bool) $val; }
+            ),
             'notify-on-install' => array(
                 function ($val) { return true; },
                 function ($val) { return $val !== 'false' && (bool) $val; }
+            ),
+            'vendor-dir' => array('is_string', function ($val) { return $val; }),
+            'bin-dir' => array('is_string', function ($val) { return $val; }),
+            'cache-dir' => array('is_string', function ($val) { return $val; }),
+            'cache-files-dir' => array('is_string', function ($val) { return $val; }),
+            'cache-repo-dir' => array('is_string', function ($val) { return $val; }),
+            'cache-vcs-dir' => array('is_string', function ($val) { return $val; }),
+            'cache-ttl' => array('is_numeric', 'intval'),
+            'cache-files-ttl' => array('is_numeric', 'intval'),
+            'cache-files-maxsize' => array(
+                function ($val) { return preg_match('/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i', $val) > 0; },
+                function ($val) { return $val; }
             ),
         );
         $multiConfigValues = array(
@@ -212,7 +293,6 @@ EOT
             ),
         );
 
-        $settingKey = $input->getArgument('setting-key');
         foreach ($uniqueConfigValues as $name => $callbacks) {
              if ($settingKey === $name) {
                 if ($input->getOption('unset')) {
@@ -260,31 +340,51 @@ EOT
      * Display the contents of the file in a pretty formatted way
      *
      * @param array           $contents
+     * @param array           $rawContents
      * @param OutputInterface $output
      * @param string|null     $k
      */
-    protected function listConfiguration(array $contents, OutputInterface $output, $k = null)
+    protected function listConfiguration(array $contents, array $rawContents, OutputInterface $output, $k = null)
     {
+        $origK = $k;
         foreach ($contents as $key => $value) {
             if ($k === null && !in_array($key, array('config', 'repositories'))) {
                 continue;
             }
 
-            if (is_array($value)) {
-                $k .= preg_replace('{^config\.}', '', $key . '.');
-                $this->listConfiguration($value, $output, $k);
+            $rawVal = isset($rawContents[$key]) ? $rawContents[$key] : null;
 
-                if (substr_count($k,'.') > 1) {
-                    $k = str_split($k,strrpos($k,'.',-2));
+            if (is_array($value) && (!is_numeric(key($value)) || ($key === 'repositories' && null === $k))) {
+                $k .= preg_replace('{^config\.}', '', $key . '.');
+                $this->listConfiguration($value, $rawVal, $output, $k);
+
+                if (substr_count($k, '.') > 1) {
+                    $k = str_split($k, strrpos($k, '.', -2));
                     $k = $k[0] . '.';
                 } else {
-                    $k = null;
+                    $k = $origK;
                 }
 
                 continue;
             }
 
-            $output->writeln('[<comment>' . $k . $key . '</comment>] <info>' . $value . '</info>');
+            if (is_array($value)) {
+                $value = array_map(function ($val) {
+                    return is_array($val) ? json_encode($val) : $val;
+                }, $value);
+
+                $value = '['.implode(', ', $value).']';
+            }
+
+            if (is_bool($value)) {
+                $value = var_export($value, true);
+            }
+
+            if (is_string($rawVal) && $rawVal != $value) {
+                $output->writeln('[<comment>' . $k . $key . '</comment>] <info>' . $rawVal . ' (' . $value . ')</info>');
+            } else {
+                $output->writeln('[<comment>' . $k . $key . '</comment>] <info>' . $value . '</info>');
+            }
         }
     }
 }

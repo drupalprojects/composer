@@ -150,6 +150,8 @@ The recommended notation for the most common licenses is (alphabetical):
 Optional, but it is highly recommended to supply this. More identifiers are
 listed at the [SPDX Open Source License Registry](http://www.spdx.org/licenses/).
 
+For closed-source software, you may use `"proprietary"` as the license identifier.
+
 An Example:
 
     {
@@ -265,7 +267,7 @@ Example:
     }
 
 `require` and `require-dev` additionally support explicit references (i.e.
-commit) for dev versions to make sure they are blocked to a given state, even
+commit) for dev versions to make sure they are locked to a given state, even
 when you run update. These only work if you explicitly require a dev version
 and append the reference with `#<ref>`. Note that while this is convenient at
 times, it should not really be how you use packages in the long term. You
@@ -280,6 +282,10 @@ Example:
             "acme/foo": "1.0.x-dev#abc123"
         }
     }
+
+It is possible to inline-alias a package constraint so that it matches a
+constraint that it otherwise would not. For more information [see the
+aliases article](articles/aliases.md).
 
 #### require
 
@@ -354,10 +360,12 @@ Example:
 
 Autoload mapping for a PHP autoloader.
 
-Currently [PSR-0](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-0.md)
-autoloading, classmap generation and files are supported. PSR-0 is the recommended way though
+Currently [`PSR-0`](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-0.md)
+autoloading, `classmap` generation and `files` are supported. PSR-0 is the recommended way though
 since it offers greater flexibility (no need to regenerate the autoloader when you add
 classes).
+
+#### PSR-0
 
 Under the `psr-0` key you define a mapping from namespaces to paths, relative to the
 package root. Note that this also supports the PEAR-style non-namespaced convention.
@@ -371,8 +379,8 @@ Example:
         "autoload": {
             "psr-0": {
                 "Monolog": "src/",
-                "Vendor\\Namespace": "src/",
-                "Pear_Style": "src/"
+                "Vendor\\Namespace\\": "src/",
+                "Vendor_Namespace_": "src/"
             }
         }
     }
@@ -406,9 +414,12 @@ use an empty prefix like:
         }
     }
 
+#### Classmap
+
 The `classmap` references are all combined, during install/update, into a single
 key => value array which may be found in the generated file
-`vendor/composer/autoload_classmap.php`.
+`vendor/composer/autoload_classmap.php`. This map is built by scanning for
+classes in all `.php` and `.inc` files in the given directories/files.
 
 You can use the classmap generation support to define autoloading for all libraries
 that do not follow PSR-0. To configure this you specify all directories or files
@@ -421,6 +432,8 @@ Example:
             "classmap": ["src/", "lib/", "Something.php"]
         }
     }
+
+#### Files
 
 If you want to require certain files explicitly on every request then you can use
 the 'files' autoloading mechanism. This is useful if your package includes PHP functions
@@ -573,16 +586,39 @@ A set of configuration options. It is only used for projects.
 
 The following options are supported:
 
+* **process-timeout:** Defaults to `300`. The duration processes like git clones
+  can run before Composer assumes they died out. You may need to make this
+  higher if you have a slow connection or huge vendors.
+* **use-include-path:** Defaults to `false`. If true, the Composer autoloader
+  will also look for classes in the PHP include path.
+* **github-protocols:** Defaults to `["git", "https", "http"]`. A list of
+  protocols to use for github.com clones, in priority order. Use this if you are
+  behind a proxy or have somehow bad performances with the git protocol.
+* **github-oauth:** A list of domain names and oauth keys. For example using
+  `{"github.com": "oauthtoken"}` as the value of this option will use `oauthtoken`
+  to access private repositories on github and to circumvent the low IP-based
+  rate limiting of their API.
 * **vendor-dir:** Defaults to `vendor`. You can install dependencies into a
   different directory if you want to.
 * **bin-dir:** Defaults to `vendor/bin`. If a project includes binaries, they
   will be symlinked into this directory.
-* **process-timeout:** Defaults to `300`. The duration processes like git clones
-  can run before Composer assumes they died out. You may need to make this
-  higher if you have a slow connection or huge vendors.
-* **github-protocols:** Defaults to `["git", "https", "http"]`. A list of
-  protocols to use for github.com clones, in priority order. Use this if you are
-  behind a proxy or have somehow bad performances with the git protocol.
+* **cache-dir:** Defaults to `$home/cache` on unix systems and
+  `C:\Users\<user>\AppData\Local\Composer` on Windows. Stores all the caches
+  used by composer. See also [COMPOSER_HOME](03-cli.md#composer-home).
+* **cache-files-dir:** Defaults to `$cache-dir/files`. Stores the zip archives
+  of packages.
+* **cache-repo-dir:** Defaults to `$cache-dir/repo`. Stores repository metadata
+  for the `composer` type and the VCS repos of type `svn`, `github` and `*bitbucket`.
+* **cache-vcs-dir:** Defaults to `$cache-dir/vcs`. Stores VCS clones for
+  loading VCS repository metadata for the `git`/`hg` types and to speed up installs.
+* **cache-files-ttl:** Defaults to `15552000` (6 months). Composer caches all
+  dist (zip, tar, ..) packages that it downloads. Those are purged after six
+  months of being unused by default. This option allows you to tweak this
+  duration (in seconds) or disable it completely by setting it to 0.
+* **cache-files-maxsize:** Defaults to `300MiB`. Composer caches all
+  dist (zip, tar, ..) packages that it downloads. When the garbage collection
+  is periodically ran, this is the maximum size the cache will be able to use.
+  Older (less used) files will be removed first until the cache fits.
 * **notify-on-install:** Defaults to `true`. Composer allows repositories to
   define a notification URL, so that they get notified whenever a package from
   that repository is installed. This option allows you to disable that behaviour.
@@ -618,7 +654,7 @@ Optional.
 A set of files that should be treated as binaries and symlinked into the `bin-dir`
 (from config).
 
-See [Vendor Bins](articles/vendor-bins.md) for more details.
+See [Vendor Binaries](articles/vendor-binaries.md) for more details.
 
 Optional.
 

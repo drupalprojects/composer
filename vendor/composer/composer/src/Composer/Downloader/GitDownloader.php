@@ -52,14 +52,14 @@ class GitDownloader extends VcsDownloader
         $this->io->write("    Checking out ".$ref);
         $command = 'cd %s && git remote set-url composer %s && git fetch composer && git fetch --tags composer';
 
-        if (!$this->io->hasAuthentication('github.com')) {
-            // capture username/password from github URL if there is one
-            $this->process->execute(sprintf('cd %s && git remote -v', escapeshellarg($path)), $output);
-            if (preg_match('{^composer\s+https://(.+):(.+)@github.com/}im', $output, $match)) {
-                $this->io->setAuthentication('github.com', $match[1], $match[2]);
-            }
+        // capture username/password from URL if there is one
+        $this->process->execute(sprintf('cd %s && git remote -v', escapeshellarg($path)), $output);
+        if (preg_match('{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im', $output, $match)) {
+            $this->io->setAuthentication($match[3], urldecode($match[1]), urldecode($match[2]));
         }
 
+        // added in git 1.7.1, prevents prompting the user
+        putenv('GIT_ASKPASS=echo');
         $commandCallable = function($url) use ($ref, $path, $command) {
             return sprintf($command, escapeshellarg($path), escapeshellarg($url), escapeshellarg($ref));
         };
@@ -90,12 +90,24 @@ class GitDownloader extends VcsDownloader
      */
     protected function cleanChanges($path, $update)
     {
-        if (!$this->io->isInteractive()) {
-            return parent::cleanChanges($path, $update);
-        }
-
         if (!$changes = $this->getLocalChanges($path)) {
             return;
+        }
+
+        if (!$this->io->isInteractive()) {
+            $discardChanges = $this->config->get('discard-changes');
+            if (true === $discardChanges) {
+                return $this->discardChanges($path);
+            }
+            if ('stash' === $discardChanges) {
+                if (!$update) {
+                    return parent::cleanChanges($path, $update);
+                }
+
+                return $this->stashChanges($path);
+            }
+
+            return parent::cleanChanges($path, $update);
         }
 
         $changes = array_map(function ($elem) {
@@ -110,9 +122,7 @@ class GitDownloader extends VcsDownloader
         while (true) {
             switch ($this->io->ask('    <info>Discard changes [y,n,v,'.($update ? 's,' : '').'?]?</info> ', '?')) {
                 case 'y':
-                    if (0 !== $this->process->execute('git reset --hard', $output, $path)) {
-                        throw new \RuntimeException("Could not reset changes\n\n:".$this->process->getErrorOutput());
-                    }
+                    $this->discardChanges($path);
                     break 2;
 
                 case 's':
@@ -120,11 +130,7 @@ class GitDownloader extends VcsDownloader
                         goto help;
                     }
 
-                    if (0 !== $this->process->execute('git stash', $output, $path)) {
-                        throw new \RuntimeException("Could not stash changes\n\n:".$this->process->getErrorOutput());
-                    }
-
-                    $this->hasStashedChanges = true;
+                    $this->stashChanges($path);
                     break 2;
 
                 case 'n':
@@ -306,12 +312,35 @@ class GitDownloader extends VcsDownloader
 
                 if ($this->io->hasAuthentication($match[1])) {
                     $auth = $this->io->getAuthentication($match[1]);
-                    $url = 'https://'.$auth['username'] . ':' . $auth['password'] . '@'.$match[1].'/'.$match[2].'.git';
+                    $url = 'https://'.urlencode($auth['username']) . ':' . urlencode($auth['password']) . '@'.$match[1].'/'.$match[2].'.git';
 
                     $command = call_user_func($commandCallable, $url);
                     if (0 === $this->process->execute($command, $handler)) {
                         return;
                     }
+                }
+            } elseif ( // private non-github repo that failed to authenticate
+                $this->io->isInteractive() &&
+                preg_match('{(https?://)([^/]+)(.*)$}i', $url, $match) &&
+                strpos($this->process->getErrorOutput(), 'fatal: Authentication failed') !== false
+            ) {
+                if ($this->io->hasAuthentication($match[2])) {
+                    $auth = $this->io->getAuthentication($match[2]);
+                } else {
+                    $this->io->write($url.' requires Authentication');
+                    $auth = array(
+                        'username'  => $this->io->ask('Username: '),
+                        'password'  => $this->io->askAndHideAnswer('Password: '),
+                    );
+                }
+
+                $url = $match[1].urlencode($auth['username']).':'.urlencode($auth['password']).'@'.$match[2].$match[3];
+
+                $command = call_user_func($commandCallable, $url);
+                if (0 === $this->process->execute($command, $handler)) {
+                    $this->io->setAuthentication($match[2], $auth['username'], $auth['password']);
+
+                    return;
                 }
             }
 
@@ -368,5 +397,29 @@ class GitDownloader extends VcsDownloader
         }
 
         return $output;
+    }
+
+    /**
+     * @param $path
+     * @throws \RuntimeException
+     */
+    protected function discardChanges($path)
+    {
+        if (0 !== $this->process->execute('git reset --hard', $output, $path)) {
+            throw new \RuntimeException("Could not reset changes\n\n:".$this->process->getErrorOutput());
+        }
+    }
+
+    /**
+     * @param $path
+     * @throws \RuntimeException
+     */
+    protected function stashChanges($path)
+    {
+        if (0 !== $this->process->execute('git stash', $output, $path)) {
+            throw new \RuntimeException("Could not stash changes\n\n:".$this->process->getErrorOutput());
+        }
+
+        $this->hasStashedChanges = true;
     }
 }

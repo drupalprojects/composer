@@ -76,7 +76,7 @@ You can add a repository to the global config.json file by passing in the
 
 To edit the file in an external editor:
 
-    <comment>%command.full_name% --edit</comment>
+    <comment>%command.full_name% --editor</comment>
 
 To choose your editor you can set the "EDITOR" env variable.
 
@@ -87,7 +87,7 @@ To get a list of configuration values in the file:
 You can always pass more than one option. As an example, if you want to edit the
 global config.json file.
 
-    <comment>%command.full_name% --edit --global</comment>
+    <comment>%command.full_name% --editor --global</comment>
 EOT
             )
         ;
@@ -248,16 +248,23 @@ EOT
             return $this->configSource->addConfigSetting('github-oauth.'.$matches[1], $values[0]);
         }
 
+        $booleanValidator = function ($val) { return in_array($val, array('true', 'false', '1', '0'), true); };
+        $booleanNormalizer = function ($val) { return $val !== 'false' && (bool) $val; };
+
         // handle config values
         $uniqueConfigValues = array(
             'process-timeout' => array('is_numeric', 'intval'),
             'use-include-path' => array(
-                function ($val) { return true; },
-                function ($val) { return $val !== 'false' && (bool) $val; }
+                $booleanValidator,
+                $booleanNormalizer
+            ),
+            'preferred-install' => array(
+                function ($val) { return in_array($val, array('auto', 'source', 'dist'), true); },
+                function ($val) { return $val; }
             ),
             'notify-on-install' => array(
-                function ($val) { return true; },
-                function ($val) { return $val !== 'false' && (bool) $val; }
+                $booleanValidator,
+                $booleanNormalizer
             ),
             'vendor-dir' => array('is_string', function ($val) { return $val; }),
             'bin-dir' => array('is_string', function ($val) { return $val; }),
@@ -270,6 +277,15 @@ EOT
             'cache-files-maxsize' => array(
                 function ($val) { return preg_match('/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i', $val) > 0; },
                 function ($val) { return $val; }
+            ),
+            'discard-changes' => array(
+                function ($val) { return in_array($val, array('stash', 'true', 'false', '1', '0'), true); },
+                function ($val) {
+                    if ('stash' === $val) {
+                        return 'stash';
+                    }
+                    return $val !== 'false' && (bool) $val;
+                }
             ),
         );
         $multiConfigValues = array(

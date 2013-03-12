@@ -64,6 +64,7 @@ class InitCommand extends Command
                 new InputOption('require', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or "foo/bar 1.0.0"'),
                 new InputOption('require-dev', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or "foo/bar 1.0.0"'),
                 new InputOption('stability', 's', InputOption::VALUE_REQUIRED, 'Minimum stability (empty or one of: '.implode(', ', array_keys(BasePackage::$stabilities)).')'),
+                new InputOption('license', 'l', InputOption::VALUE_REQUIRED, 'License of package'),
             ))
             ->setHelp(<<<EOT
 The <info>init</info> command creates a basic composer.json file
@@ -80,7 +81,7 @@ EOT
     {
         $dialog = $this->getHelperSet()->get('dialog');
 
-        $whitelist = array('name', 'description', 'author', 'homepage', 'require', 'require-dev', 'stability');
+        $whitelist = array('name', 'description', 'author', 'homepage', 'require', 'require-dev', 'stability', 'license');
 
         $options = array_filter(array_intersect_key($input->getOptions(), array_flip($whitelist)));
 
@@ -254,6 +255,13 @@ EOT
         );
         $input->setOption('stability', $minimumStability);
 
+        $license = $input->getOption('license') ?: false;
+        $license = $dialog->ask(
+            $output,
+            $dialog->getQuestion('License', $license)
+        );
+        $input->setOption('license', $license);
+
         $output->writeln(array(
             '',
             'Define your dependencies.',
@@ -284,15 +292,7 @@ EOT
             ));
         }
 
-        $token = strtolower($name);
-
-        $this->repos->filterPackages(function ($package) use ($token, &$packages) {
-            if (false !== strpos($package->getName(), $token)) {
-                $packages[] = $package;
-            }
-        });
-
-        return $packages;
+        return $this->repos->search($name);
     }
 
     protected function determineRequirements(InputInterface $input, OutputInterface $output, $requires = array())
@@ -331,31 +331,57 @@ EOT
                     ''
                 ));
 
+                $exactMatch = null;
+                $choices = array();
                 foreach ($matches as $position => $package) {
-                    $output->writeln(sprintf(' <info>%5s</info> %s <comment>%s</comment>', "[$position]", $package->getPrettyName(), $package->getPrettyVersion()));
+                    $choices[] = sprintf(' <info>%5s</info> %s', "[$position]", $package['name']);
+                    if ($package['name'] === $package) {
+                        $exactMatch = true;
+                        break;
+                    }
                 }
 
-                $output->writeln('');
+                // no match, prompt which to pick
+                if (!$exactMatch) {
+                    $output->writeln($choices);
+                    $output->writeln('');
 
-                $validator = function ($selection) use ($matches) {
-                    if ('' === $selection) {
-                        return false;
+                    $validator = function ($selection) use ($matches) {
+                        if ('' === $selection) {
+                            return false;
+                        }
+
+                        if (!is_numeric($selection) && preg_match('{^\s*(\S+)\s+(\S.*)\s*$}', $selection, $matches)) {
+                            return $matches[1].' '.$matches[2];
+                        }
+
+                        if (!isset($matches[(int) $selection])) {
+                            throw new \Exception('Not a valid selection');
+                        }
+
+                        $package = $matches[(int) $selection];
+
+                        return $package['name'];
+                    };
+
+                    $package = $dialog->askAndValidate($output, $dialog->getQuestion('Enter package # to add, or the complete package name if it is not listed', false, ':'), $validator, 3);
+                }
+
+                // no constraint yet, prompt user
+                if (false !== $package && false === strpos($package, ' ')) {
+                    $validator = function ($input) {
+                        $input = trim($input);
+
+                        return $input ?: false;
+                    };
+
+                    $constraint = $dialog->askAndValidate($output, $dialog->getQuestion('Enter the version constraint to require', false, ':'), $validator, 3);
+                    if (false === $constraint) {
+                        continue;
                     }
 
-                    if (!is_numeric($selection) && preg_match('{^\s*(\S+) +(\S.*)\s*}', $selection, $matches)) {
-                        return $matches[1].' '.$matches[2];
-                    }
-
-                    if (!isset($matches[(int) $selection])) {
-                        throw new \Exception('Not a valid selection');
-                    }
-
-                    $package = $matches[(int) $selection];
-
-                    return sprintf('%s %s', $package->getName(), $package->getPrettyVersion());
-                };
-
-                $package = $dialog->askAndValidate($output, $dialog->getQuestion('Enter package # to add, or a "[package] [version]" couple if it is not listed', false, ':'), $validator, 3);
+                    $package .= ' '.$constraint;
+                }
 
                 if (false !== $package) {
                     $requires[] = $package;

@@ -13,6 +13,7 @@ namespace Composer\Test\Mock;
 
 use Composer\Installer\InstallationManager;
 use Composer\Repository\RepositoryInterface;
+use Composer\Repository\InstalledRepositoryInterface;
 use Composer\Package\PackageInterface;
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\DependencyResolver\Operation\UpdateOperation;
@@ -30,6 +31,11 @@ class InstallationManagerMock extends InstallationManager
     public function getInstallPath(PackageInterface $package)
     {
         return '';
+    }
+
+    public function isPackageInstalled(InstalledRepositoryInterface $repo, PackageInterface $package)
+    {
+        return $repo->hasPackage($package);
     }
 
     public function install(RepositoryInterface $repo, InstallOperation $operation)

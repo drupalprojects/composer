@@ -296,17 +296,7 @@ unless those requirements can be met.
 
 Lists packages required for developing this package, or running
 tests, etc. The dev requirements of the root package only will be installed
-if `install` or `update` is ran with `--dev`.
-
-Packages listed here and their dependencies can not overrule the resolution
-found with the packages listed in require. This is even true if a different
-version of a package would be installable and solve the conflict. The reason
-is that `install --dev` produces the exact same state as just `install`, apart
-from the additional dev packages.
-
-If you run into such a conflict, you can specify the conflicting package in
-the require section and require the right version number to resolve the
-conflict.
+if `install` is run with `--dev` or if `update` is run without `--no-dev`.
 
 #### conflict
 
@@ -591,6 +581,9 @@ The following options are supported:
   higher if you have a slow connection or huge vendors.
 * **use-include-path:** Defaults to `false`. If true, the Composer autoloader
   will also look for classes in the PHP include path.
+* **preferred-install:** Defaults to `auto` and can be any of `source`, `dist` or
+  `auto`. This option allows you to set the install method Composer will prefer to
+  use.
 * **github-protocols:** Defaults to `["git", "https", "http"]`. A list of
   protocols to use for github.com clones, in priority order. Use this if you are
   behind a proxy or have somehow bad performances with the git protocol.
@@ -608,7 +601,7 @@ The following options are supported:
 * **cache-files-dir:** Defaults to `$cache-dir/files`. Stores the zip archives
   of packages.
 * **cache-repo-dir:** Defaults to `$cache-dir/repo`. Stores repository metadata
-  for the `composer` type and the VCS repos of type `svn`, `github` and `*bitbucket`.
+  for the `composer` type and the VCS repos of type `svn`, `github` and `bitbucket`.
 * **cache-vcs-dir:** Defaults to `$cache-dir/vcs`. Stores VCS clones for
   loading VCS repository metadata for the `git`/`hg` types and to speed up installs.
 * **cache-files-ttl:** Defaults to `15552000` (6 months). Composer caches all
@@ -622,6 +615,11 @@ The following options are supported:
 * **notify-on-install:** Defaults to `true`. Composer allows repositories to
   define a notification URL, so that they get notified whenever a package from
   that repository is installed. This option allows you to disable that behaviour.
+* **discard-changes:** Defaults to `false` and can be any of `true`, `false` or
+  `"stash"`. This option allows you to set the default style of handling dirty
+  updates when in non-interactive mode. `true` will always discard changes in
+  vendors, while `"stash"` will try to stash and reapply. Use this for CI
+  servers or deploy scripts if you tend to have modified vendors.
 
 Example:
 

@@ -13,53 +13,7 @@ function composer_drush_command() {
     'arguments' => array(
       'command' => 'Run "drush composer" for a list of available commands.',
     ),
-    'options' => array(
-      'require-dev' => 'Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or "foo/bar 1.0.0".',
-      'quiet' => 'Do not output any message.',
-      'version' => 'Display Composer version information.',
-      'ansi' => 'Force ANSI output.',
-      'no-ansi' => 'Disable ANSI output.',
-      'profile' => 'Display timing and memory usage information.',
-      'no-interaction' => 'Do not ask any interactive questions.',
-      'no-custom-installers' => 'Disables all custom installers.',
-      'verbose' => 'Increase verbosity of messages.',
-      'prefer-source' => 'Forces isntallation from package sources when possible, including VCS information.',
-      'prefer-dist' => 'Forces installation from package dist even for dev versions.',
-      'dry-run' => 'Outputs the operations but will not execute anything.',
-      'dev' => 'Specifies that the development requirements are to be retrieved.',
-      'no-dev' => 'Skip installing packages listed in "require-dev" (this is the default for "install").',
-      'no-scripts' => 'Skips the execution of all scripts defined in the composer.json file.',
-      'no-custom-installers' => 'Disables custom installers.',
-      'no-progress' => 'Removes the progress display that can mess with some terminals or scripts which do not handle backspace characters.',
-      'optimize' => 'Optimizes PSR0 packages to be loaded with classmaps too, good for production.',
-      'optimize-autoloader' => 'Convert PSR-0 autoloading to classmap to get a faster autoloader. This is recommended especially for production, but can take  a bit of time to run so it is currently not done by default.',
-      'quiet' => 'Do not output any message.',
-      'xml' => 'To output as XML',
-      'version' => 'Display this application version.',
-      'no-interaction' => 'Do not ask any interactive question.',
-      'help' => 'Display help message.',
-      'working-dir' => 'If specified, use the given directory as working directory.',
-      'global' => 'Apply command to the global config file.',
-      'file' => 'Operate on a specific file instead of composer.json. Note that this cannot be used in conjunction with the "--global" option.',
-      'editor' => 'Open editor',
-      'unset' => 'Unset the given setting-key.',
-      'list' => 'List configuration settings.',
-      'no-update' => 'Disables the automatic update of the dependencies.',
-      'repository-url' => 'Pick a different repository url to look for the package.',
-      'keep-vcs' => 'Whether to prevent deletion vcs folder.',
-      'stability' => 'Minimum stability of package. Defaults to "stable".',
-      'minimum-stability' => 'Minimum stability (empty or one of: stable, RC, beta, alpha, dev)',
-      'name' => 'Name of the package',
-      'description' => 'Description of package',
-      'author' => 'Author name of package',
-      'homepage' => 'Homepage of package',
-      'require' => 'Package to require with a version constraint. Should be in format "foo/bar:1.0.0".',
-      'only-name' => 'Search only in name',
-      'installed' => 'List the packages that are installed.',
-      'platform' => 'List only platform packages (php & extensions).',
-      'self' => 'List the root package info.',
-      'link-type' => 'The link types to match on, can be specified multiple times.',
-    ),
+    'options' => drush_composer_getoptions(),
     'examples' => array(
       'drush composer' => 'Display available commands available with Composer.',
       'drush composer install' => 'Parses composer.json in the current directory.',
@@ -157,4 +111,33 @@ function composer_drush_pm_post_download($project, $release) {
     // Switch back to the original file path.
     chdir($original);
   }
+}
+
+/**
+ * Parses composer.drush.xml to get the available options.
+ *
+ * drush composer
+ */
+function drush_composer_getoptions() {
+  static $options = array();
+  
+  if (empty($options)) {
+	// Inject additional information from the list XML file.
+	// Use __FILE__ instead of __DIR__ as PHP 5.3 might not be available.
+	$xml = @simplexml_load_file(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'composer.drush.xml');
+
+	if ($xml) {
+	  foreach ($xml->commands->command as $command) {
+	    if (isset($command->options->option)) {
+	      foreach ($command->options->option as $option) {
+	        $name = str_replace('--', '', (string) $option['name']);
+	        $description = (string) $option->description;
+	        $options[$name] = $description;
+	      }
+	    }
+	  }
+	}
+  }
+
+  return $options;
 }

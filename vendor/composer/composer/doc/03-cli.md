@@ -264,7 +264,7 @@ the local composer.json file or the global config.json file.
 configuration value.  For settings that can take an array of values (like
 `github-protocols`), more than one setting-value arguments are allowed.
 
-See the [config schema section](04-schema.md#config-root-only) for valid configuration
+See the [config schema section](04-schema.md#config) for valid configuration
 options.
 
 ### Options
@@ -422,5 +422,10 @@ configuration in the project's `composer.json` always wins.
 
 This env var controls the time composer waits for commands (such as git
 commands) to finish executing. The default value is 300 seconds (5 minutes).
+
+### COMPOSER_NO_INTERACTION
+
+If set to 1, this env var will make composer behave as if you passed the
+`--no-interaction` flag to every command. This can be set on build boxes/CI.
 
 &larr; [Libraries](02-libraries.md)  |  [Schema](04-schema.md) &rarr;

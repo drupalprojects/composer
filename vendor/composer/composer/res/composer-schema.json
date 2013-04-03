@@ -202,6 +202,16 @@
                 }
             }
         },
+        "archive": {
+            "type": ["object"],
+            "description": "Options for creating package archives for distribution.",
+            "properties": {
+                "exclude": {
+                    "type": "array",
+                    "description": "A list of patterns for paths to exclude or include if prefixed with an exclamation mark."
+                }
+            }
+        },
         "repositories": {
             "type": ["object", "array"],
             "description": "A set of additional repositories where packages can be found.",
@@ -210,6 +220,10 @@
         "minimum-stability": {
             "type": ["string"],
             "description": "The minimum stability the packages must have to be install-able. Possible values are: dev, alpha, beta, RC, stable."
+        },
+        "prefer-stable": {
+            "type": ["boolean"],
+            "description": "If set to true, stable packages will be prefered to dev packages when possible, even if the minimum-stability allows unstable packages."
         },
         "bin": {
             "type": ["array"],

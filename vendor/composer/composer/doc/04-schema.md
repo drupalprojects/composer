@@ -493,6 +493,13 @@ a given package can be done in `require` or `require-dev` (see
 Available options (in order of stability) are `dev`, `alpha`, `beta`, `RC`,
 and `stable`.
 
+### prefer-stable <span>(root-only)</span>
+
+When this is enabled, Composer will prefer more stable packages over unstable
+ones when finding compatible stable packages is possible. If you require a
+dev version or only alphas are available for a package, those will still be
+selected granted that the minimum-stability allows for it.
+
 ### repositories <span>(root-only)</span>
 
 Custom package repositories to use.
@@ -653,6 +660,31 @@ A set of files that should be treated as binaries and symlinked into the `bin-di
 (from config).
 
 See [Vendor Binaries](articles/vendor-binaries.md) for more details.
+
+Optional.
+
+### archive
+
+A set of options for creating package archives.
+
+The following options are supported:
+
+* **exclude:** Allows configuring a list of patterns for excluded paths. The
+  pattern syntax matches .gitignore files. A leading exclamation mark (!) will
+  result in any matching files to be included even if a previous pattern
+  excluded them. A leading slash will only match at the beginning of the project
+  relative path. An asterisk will not expand to a directory separator.
+
+Example:
+
+    {
+        "archive": {
+            "exclude": ["/foo/bar", "baz", "/*.test", "!/foo/bar/baz"]
+        }
+    }
+
+The example will include `/dir/foo/bar/file`, `/foo/bar/baz`, `/file.php`,
+`/foo/my.test` but it will exclude `/foo/bar/any`, `/foo/baz`, and `/my.test`.
 
 Optional.
 

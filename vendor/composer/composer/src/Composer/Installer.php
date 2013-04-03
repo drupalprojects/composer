@@ -234,7 +234,7 @@ class Installer
 
                 // split dev and non-dev requirements by checking what would be removed if we update without the dev requirements
                 if ($this->devMode && $this->package->getDevRequires()) {
-                    $policy = new DefaultPolicy();
+                    $policy = $this->createPolicy();
                     $pool = $this->createPool();
                     $pool->addRepository($installedRepo, $aliases);
 
@@ -308,14 +308,14 @@ class Installer
         $this->io->write('<info>Loading composer repositories with package information</info>');
 
         // creating repository pool
-        $policy = new DefaultPolicy();
+        $policy = $this->createPolicy();
         $pool = $this->createPool();
         $pool->addRepository($installedRepo, $aliases);
         if ($installFromLock) {
             $pool->addRepository($lockedRepository, $aliases);
         }
 
-        if (!$installFromLock || !$this->locker->isCompleteFormat()) {
+        if (!$installFromLock) {
             $repositories = $this->repositoryManager->getRepositories();
             foreach ($repositories as $repository) {
                 $pool->addRepository($repository, $aliases);
@@ -392,10 +392,6 @@ class Installer
             }
         } elseif ($installFromLock) {
             $this->io->write('<info>Installing dependencies'.($withDevReqs?' (including require-dev)':'').' from lock file</info>');
-
-            if (!$this->locker->isCompleteFormat($withDevReqs)) {
-                $this->io->write('<warning>Warning: Your lock file is in a deprecated format. It will most likely take a *long* time for composer to install dependencies, and may cause dependency solving issues.</warning>');
-            }
 
             if (!$this->locker->isFresh()) {
                 $this->io->write('<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. Run update to update them.</warning>');
@@ -515,6 +511,11 @@ class Installer
         }
 
         return new Pool($minimumStability, $stabilityFlags);
+    }
+
+    private function createPolicy()
+    {
+        return new DefaultPolicy($this->package->getPreferStable());
     }
 
     private function createRequest(Pool $pool, RootPackageInterface $rootPackage, PlatformRepository $platformRepo)
@@ -756,7 +757,7 @@ class Installer
             $packageQueue = new \SplQueue;
 
             $depPackages = $pool->whatProvides($packageName);
-            if (count($depPackages) == 0 && !in_array($packageName, $requiredPackageNames)) {
+            if (count($depPackages) == 0 && !in_array($packageName, $requiredPackageNames) && !in_array($packageName, array('nothing', 'lock'))) {
                 $this->io->write('<warning>Package "' . $packageName . '" listed for update is not installed. Ignoring.<warning>');
             }
 

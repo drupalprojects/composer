@@ -295,7 +295,16 @@ class Installer
         $installFromLock = false;
         if (!$this->update && $this->locker->isLocked()) {
             $installFromLock = true;
-            $lockedRepository = $this->locker->getLockedRepository($withDevReqs);
+            try {
+                $lockedRepository = $this->locker->getLockedRepository($withDevReqs);
+            } catch (\RuntimeException $e) {
+                // if there are dev requires, then we really can not install
+                if ($this->package->getDevRequires()) {
+                    throw $e;
+                }
+                // no require-dev in composer.json and the lock file was created with no dev info, so skip them
+                $lockedRepository = $this->locker->getLockedRepository();
+            }
         }
 
         $this->whitelistUpdateDependencies(
@@ -330,7 +339,7 @@ class Installer
             $removedUnstablePackages = array();
             foreach ($localRepo->getPackages() as $package) {
                 if (
-                    !$pool->isPackageAcceptable($package->getName(), $package->getStability())
+                    !$pool->isPackageAcceptable($package->getNames(), $package->getStability())
                     && $this->installationManager->isPackageInstalled($localRepo, $package)
                 ) {
                     $removedUnstablePackages[$package->getName()] = true;
@@ -708,7 +717,7 @@ class Installer
     private function extractPlatformRequirements($links) {
         $platformReqs = array();
         foreach ($links as $link) {
-            if (preg_match('{^(?:php(?:-64bit)?|(?:ext|lib)-[^/]+)$}i', $link->getTarget())) {
+            if (preg_match(PlatformRepository::PLATFORM_PACKAGE_REGEX, $link->getTarget())) {
                 $platformReqs[$link->getTarget()] = $link->getPrettyConstraint();
             }
         }

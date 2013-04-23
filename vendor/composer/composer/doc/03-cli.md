@@ -348,6 +348,14 @@ performance.
   autoloader. This is recommended especially for production, but can take
   a bit of time to run so it is currently not done by default.
 
+## diagnose
+
+If you think you found a bug, or something is behaving strangely, you might
+want to run the `diagnose` command to perform automated checks for many common
+problems.
+
+    $ php composer.phar diagnose
+
 ## help
 
 To get more information about a certain command, just use `help`.
@@ -422,6 +430,10 @@ configuration in the project's `composer.json` always wins.
 
 This env var controls the time composer waits for commands (such as git
 commands) to finish executing. The default value is 300 seconds (5 minutes).
+
+### COMPOSER_DISCARD_CHANGES
+
+This env var controls the discard-changes [config option](04-schema.md#config).
 
 ### COMPOSER_NO_INTERACTION
 

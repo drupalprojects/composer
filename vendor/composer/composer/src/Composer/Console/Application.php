@@ -199,6 +199,8 @@ class Application extends BaseApplication
         $commands[] = new Command\DumpAutoloadCommand();
         $commands[] = new Command\StatusCommand();
         $commands[] = new Command\ArchiveCommand();
+        $commands[] = new Command\DiagnoseCommand();
+        $commands[] = new Command\RunScriptCommand();
 
         if ('phar:' === substr(__FILE__, 0, 5)) {
             $commands[] = new Command\SelfUpdateCommand();

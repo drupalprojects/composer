@@ -26,7 +26,7 @@ use Composer\Autoload\AutoloadGenerator;
  */
 class Composer
 {
-    const VERSION = 'f744ec16f5b0dcc5350ab628ed0a27f12227403b';
+    const VERSION = '@package_version@';
 
     /**
      * @var Package\RootPackageInterface

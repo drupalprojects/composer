@@ -240,7 +240,7 @@ class ComposerRepository extends ArrayRepository implements StreamableRepository
         }
 
         // skip platform packages
-        if (preg_match('{^(?:php(?:-64bit)?|(?:ext|lib)-[^/]+)$}i', $name) || '__root__' === $name) {
+        if (preg_match(PlatformRepository::PLATFORM_PACKAGE_REGEX, $name) || '__root__' === $name) {
             return array();
         }
 
@@ -295,6 +295,25 @@ class ComposerRepository extends ArrayRepository implements StreamableRepository
                         }
                     }
                 } else {
+                    if (isset($version['provide']) || isset($version['replace'])) {
+                        // collect names
+                        $names = array(
+                            strtolower($version['name']) => true,
+                        );
+                        if (isset($version['provide'])) {
+                            foreach ($version['provide'] as $target => $constraint) {
+                                $names[strtolower($target)] = true;
+                            }
+                        }
+                        if (isset($version['replace'])) {
+                            foreach ($version['replace'] as $target => $constraint) {
+                                $names[strtolower($target)] = true;
+                            }
+                        }
+                        $names = array_keys($names);
+                    } else {
+                        $names = array(strtolower($version['name']));
+                    }
                     if (!$pool->isPackageAcceptable(strtolower($version['name']), VersionParser::parseStability($version['version']))) {
                         continue;
                     }

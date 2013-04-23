@@ -68,6 +68,7 @@ function drush_composer_getoptions() {
       foreach ($xml->commands->command as $command) {
         if (isset($command->options->option)) {
           foreach ($command->options->option as $option) {
+            // Register the option, ignoring the shortcut.
             $name = str_replace('--', '', (string) $option['name']);
             $description = (string) $option->description;
             $options[$name] = $description;

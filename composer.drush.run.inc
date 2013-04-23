@@ -25,16 +25,16 @@ function drush_composer_run($command = '') {
   $valid_options = composer_drush_command();
   $valid_options = array_keys($valid_options['composer']['options']);
   foreach ($options as $key => $option) {
-    // Go through each option and make sure it's valid (prefix with --).
+    // Go through each option and make sure it's a valid option.
     $is_valid = FALSE;
     foreach ($valid_options as $valid) {
-      if ($option == '--' . $valid) {
+      if (strstr($option, $valid) !== FALSE) {
         $is_valid = TRUE;
         break;
       }
     }
     // Remove the option if it is not valid.
-    if (!$is_valid) {
+    if ($is_valid == FALSE) {
       unset($options[$key]);
     }
   }

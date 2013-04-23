@@ -344,6 +344,44 @@
         </option>
       </options>
     </command>
+    <command id="diagnose" name="diagnose">
+      <usage>diagnose</usage>
+      <description>Diagnoses the system to identify common errors.</description>
+      <help>The &lt;info&gt;diagnose&lt;/info&gt; command checks common errors to help debugging problems.
+ </help>
+      <aliases/>
+      <arguments/>
+      <options>
+        <option name="--help" shortcut="-h" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display this help message.</description>
+        </option>
+        <option name="--quiet" shortcut="-q" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Do not output any message.</description>
+        </option>
+        <option name="--verbose" shortcut="-v" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Increase verbosity of messages.</description>
+        </option>
+        <option name="--version" shortcut="-V" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display this application version.</description>
+        </option>
+        <option name="--ansi" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Force ANSI output.</description>
+        </option>
+        <option name="--no-ansi" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Disable ANSI output.</description>
+        </option>
+        <option name="--no-interaction" shortcut="-n" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Do not ask any interactive question.</description>
+        </option>
+        <option name="--profile" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display timing and memory usage information</description>
+        </option>
+        <option name="--working-dir" shortcut="-d" accept_value="1" is_value_required="1" is_multiple="0">
+          <description>If specified, use the given directory as working directory.</description>
+          <defaults/>
+        </option>
+      </options>
+    </command>
     <command id="dump-autoload" name="dump-autoload">
       <usage>dump-autoload [-o|--optimize]</usage>
       <description>Dumps the autoloader</description>
@@ -678,6 +716,56 @@
         </option>
       </options>
     </command>
+    <command id="run-script" name="run-script">
+      <usage>run-script [--dev] [--no-dev] script</usage>
+      <description>Run the scripts defined in composer.json.</description>
+      <help>The &lt;info&gt;run-script&lt;/info&gt; command runs scripts defined in composer.json:
+ 
+ &lt;info&gt;php composer.phar run-script post-update-cmd&lt;/info&gt;</help>
+      <aliases/>
+      <arguments>
+        <argument name="script" is_required="1" is_array="0">
+          <description>Script name to run.</description>
+          <defaults/>
+        </argument>
+      </arguments>
+      <options>
+        <option name="--dev" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Sets the dev mode.</description>
+        </option>
+        <option name="--no-dev" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Disables the dev mode.</description>
+        </option>
+        <option name="--help" shortcut="-h" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display this help message.</description>
+        </option>
+        <option name="--quiet" shortcut="-q" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Do not output any message.</description>
+        </option>
+        <option name="--verbose" shortcut="-v" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Increase verbosity of messages.</description>
+        </option>
+        <option name="--version" shortcut="-V" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display this application version.</description>
+        </option>
+        <option name="--ansi" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Force ANSI output.</description>
+        </option>
+        <option name="--no-ansi" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Disable ANSI output.</description>
+        </option>
+        <option name="--no-interaction" shortcut="-n" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Do not ask any interactive question.</description>
+        </option>
+        <option name="--profile" shortcut="" accept_value="0" is_value_required="0" is_multiple="0">
+          <description>Display timing and memory usage information</description>
+        </option>
+        <option name="--working-dir" shortcut="-d" accept_value="1" is_value_required="1" is_multiple="0">
+          <description>If specified, use the given directory as working directory.</description>
+          <defaults/>
+        </option>
+      </options>
+    </command>
     <command id="search" name="search">
       <usage>search [-N|--only-name] tokens1 ... [tokensN]</usage>
       <description>Search for packages</description>
@@ -781,7 +869,7 @@
           <defaults/>
         </argument>
         <argument name="version" is_required="0" is_array="0">
-          <description>Version to inspect</description>
+          <description>Version or version constraint to inspect</description>
           <defaults/>
         </argument>
       </arguments>
@@ -1001,12 +1089,14 @@
       <command>config</command>
       <command>create-project</command>
       <command>depends</command>
+      <command>diagnose</command>
       <command>dump-autoload</command>
       <command>help</command>
       <command>init</command>
       <command>install</command>
       <command>list</command>
       <command>require</command>
+      <command>run-script</command>
       <command>search</command>
       <command>self-update</command>
       <command>show</command>

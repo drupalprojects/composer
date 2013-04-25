@@ -13,7 +13,7 @@ function composer_drush_command() {
     'arguments' => array(
       'command' => 'Run "drush composer" for a list of available commands.',
     ),
-    'options' => drush_composer_getoptions(),
+    'allow-additional-options' => TRUE,
     'examples' => array(
       'drush composer' => 'Display available commands available with Composer.',
       'drush composer install' => 'Parses composer.json in the current directory.',
@@ -34,7 +34,7 @@ function composer_drush_command() {
  *   The Composer command we are to execute.
  */
 function drush_composer($command = '') {
-  // Make sure our PHP requirements are met.
+  // Make sure the PHP requirements are met.
   $php = '5.3.2';
   $current = phpversion();
   if (version_compare($current, $php, '<')) {
@@ -50,33 +50,6 @@ function drush_composer($command = '') {
   // parsing the file.
   require_once(dirname(__FILE__) . '/composer.drush.run.inc');
 
-  return drush_composer_run($command);
-}
-
-/**
- * Parses composer.drush.xml to get the available options.
- */
-function drush_composer_getoptions() {
-  static $options = array();
-
-  if (empty($options)) {
-    // Inject additional information from the list XML file.
-    // Use __FILE__ instead of __DIR__ as PHP 5.3 might not be available.
-    $xml = @simplexml_load_file(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'composer.drush.xml');
-
-    if ($xml) {
-      foreach ($xml->commands->command as $command) {
-        if (isset($command->options->option)) {
-          foreach ($command->options->option as $option) {
-            // Register the option, ignoring the shortcut.
-            $name = str_replace('--', '', (string) $option['name']);
-            $description = (string) $option->description;
-            $options[$name] = $description;
-          }
-        }
-      }
-    }
-  }
-
-  return $options;
+  // Run the Composer command using the given function arguments.
+  return drush_composer_run(func_get_args());
 }

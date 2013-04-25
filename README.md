@@ -12,12 +12,3 @@ Usage
 -----
 
     $ drush composer
-
-Development
------------
-
-To update Drush Composer to the latest version of Composer, use this following:
-
-    $ cd ~/.drush/composer
-    $ drush composer update
-    $ vendor/bin/composer list --xml > composer.drush.xml

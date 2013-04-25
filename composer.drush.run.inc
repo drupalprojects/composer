@@ -4,53 +4,31 @@
  * Provides the Composer integration in a seperate file so that PHP < 5.3 works.
  */
 
+use Composer\Console\Application;
+
 /**
  * Executes the given command in the current working directory.
  */
-function drush_composer_run($command = '') {
+function drush_composer_run($arguments = array()) {
+  // Prepend Composer to the list of arguments.
+  array_unshift($arguments, 'composer');
+
+  // Append all the command line options (--option and -o).
+  foreach ($_SERVER['argv'] as $index => $arg) {
+    if ($arg[0] == '-') {
+      $arguments[] = $arg;
+    }
+  }
+
+  // Override the argument list with the new set of arguments.
+  $_SERVER['argv'] = $arguments;
+  $_SERVER['argc'] = count($arguments);
+
   // Autoload the required classes.
   $loader = require_once(__DIR__ . '/vendor/autoload.php');
 
-  // Composer uses argv to retrieve command line arguments, so we will emulate
-  // any options being passed in.
-  $options = array();
-  foreach ($_SERVER['argv'] as $option) {
-    if (substr($option, 0, 2) == '--') {
-      $options[] = $option;
-    }
-  }
-
-  // Now that we have all the options, make sure to strip any invalid options
-  // so that Composer still runs correctly.
-  $valid_options = composer_drush_command();
-  $valid_options = array_keys($valid_options['composer']['options']);
-  foreach ($options as $key => $option) {
-    // Go through each option and make sure it's a valid option.
-    $is_valid = FALSE;
-    foreach ($valid_options as $valid) {
-      if (strstr($option, $valid) !== FALSE) {
-        $is_valid = TRUE;
-        break;
-      }
-    }
-    // Remove the option if it is not valid.
-    if ($is_valid == FALSE) {
-      unset($options[$key]);
-    }
-  }
-
-  // Now that we have the options set up, we'll mask the actual arguments.
-  $_SERVER['argv'] = array('composer');
-  foreach (func_get_args() as $arg) {
-    $_SERVER['argv'][] = $arg;
-  }
-  foreach ($options as $option) {
-    $_SERVER['argv'][] = $option;
-  }
-  $_SERVER['argc'] = count($_SERVER['argv']);
-
   // Run the Composer command.
-  $application = new Composer\Console\Application();
+  $application = new Application();
   $application->setAutoExit(false);
   $application->run();
 

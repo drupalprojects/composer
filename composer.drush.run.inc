@@ -20,7 +20,8 @@ function drush_composer_run($arguments = array()) {
     }
   }
 
-  // Override the argument list with the new set of arguments.
+  // Backup and override the server command line arguments.
+  $backup = $_SERVER['argv'];
   $_SERVER['argv'] = $arguments;
   $_SERVER['argc'] = count($arguments);
 
@@ -31,6 +32,10 @@ function drush_composer_run($arguments = array()) {
   $application = new Application();
   $application->setAutoExit(false);
   $application->run();
+
+  // Now that Composer has run, restore the original server arguments.
+  $_SERVER['argv'] = $backup;
+  $_SERVER['argc'] = count($backup);
 
   return $loader;
 }

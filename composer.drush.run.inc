@@ -36,6 +36,7 @@ function drush_composer_run($arguments = array()) {
       // It's invalid, so do not add it into the final $args.
     }
     else {
+      // Append all normal arguments to the valid list.
       $args[] = $arg;
     }
   }
@@ -65,6 +66,9 @@ function drush_composer_run($arguments = array()) {
  *
  * @param string $command
  *   The command to get the options for.
+ *
+ * @return array
+ *   A list of valid options for the given command.
  */
 function drush_composer_get_options($command = 'list') {
   static $commands = array();

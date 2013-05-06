@@ -2,6 +2,8 @@
 /**
  * @file
  * Drush wrapper around the Composer package management system.
+ *
+ * @author Rob Loach (http://robloach.net)
  */
 
 /**
@@ -18,8 +20,8 @@ function composer_drush_command() {
       'drush composer' => 'Display available commands available with Composer.',
       'drush composer install' => 'Parses composer.json in the current directory.',
       'drush composer update' => 'Updates dependencies to the latest version.',
-      'drush composer show symfony/symfony' => 'Displays package information about Symfony.',
-      'drush composer create-project twig/twig' => 'Downloads and installs the Twig package.',
+      'drush composer show --installed' => 'Displays a liste of installed packages.',
+      'drush composer require twig/twig' => 'Downloads and installs Twig.',
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUSH,
   );

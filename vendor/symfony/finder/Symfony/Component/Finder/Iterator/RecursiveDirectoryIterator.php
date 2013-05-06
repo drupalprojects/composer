@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Finder\Iterator;
 
+use Symfony\Component\Finder\Exception\AccessDeniedException;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
@@ -20,13 +21,28 @@ use Symfony\Component\Finder\SplFileInfo;
  */
 class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
 {
-    public function __construct($path, $flags)
+    /**
+     * @var boolean
+     */
+    private $ignoreUnreadableDirs;
+
+    /**
+     * Constructor.
+     *
+     * @param string  $path
+     * @param int     $flags
+     * @param boolean $ignoreUnreadableDirs
+     *
+     * @throws \RuntimeException
+     */
+    public function __construct($path, $flags, $ignoreUnreadableDirs = false)
     {
         if ($flags & (self::CURRENT_AS_PATHNAME | self::CURRENT_AS_SELF)) {
             throw new \RuntimeException('This iterator only support returning current as fileinfo.');
         }
 
         parent::__construct($path, $flags);
+        $this->ignoreUnreadableDirs = $ignoreUnreadableDirs;
     }
 
     /**
@@ -37,5 +53,24 @@ class RecursiveDirectoryIterator extends \RecursiveDirectoryIterator
     public function current()
     {
         return new SplFileInfo(parent::current()->getPathname(), $this->getSubPath(), $this->getSubPathname());
+    }
+
+    /**
+     * @return \RecursiveIterator
+     *
+     * @throws AccessDeniedException
+     */
+    public function getChildren()
+    {
+        try {
+            return parent::getChildren();
+        } catch (\UnexpectedValueException $e) {
+            if ($this->ignoreUnreadableDirs) {
+                // If directory is unreadable and finder is set to ignore it, a fake empty content is returned.
+                return new \RecursiveArrayIterator(array());
+            } else {
+                throw new AccessDeniedException($e->getMessage(), $e->getCode(), $e);
+            }
+        }
     }
 }

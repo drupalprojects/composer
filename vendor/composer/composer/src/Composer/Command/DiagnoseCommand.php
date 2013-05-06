@@ -56,6 +56,8 @@ EOT
         if (!empty($opts['http']['proxy'])) {
             $output->write('Checking HTTP proxy: ');
             $this->outputResult($output, $this->checkHttpProxy());
+            $output->write('Checking HTTPS proxy support for request_fulluri: ');
+            $this->outputResult($output, $this->checkHttpsProxyFullUriRequestParam());
         }
 
         $composer = $this->getComposer(false);
@@ -134,6 +136,35 @@ EOT
             }
         } catch (\Exception $e) {
             return $e;
+        }
+
+        return true;
+    }
+
+    /**
+     * Due to various proxy servers configurations, some servers cant handle non-standard HTTP "http_proxy_request_fulluri" parameter,
+     * and will return error 500/501 (as not implemented), see discussion @ https://github.com/composer/composer/pull/1825.
+     * This method will test, if you need to disable this parameter via setting extra environment variable in your system.
+     *
+     * @return bool|string
+     */
+    private function checkHttpsProxyFullUriRequestParam()
+    {
+        $url = 'https://api.github.com/repos/Seldaek/jsonlint/zipball/1.0.0 ';
+        try {
+            $rfcResult = $this->rfs->getContents('api.github.com', $url, false);
+        } catch (TransportException $e) {
+            if (!extension_loaded('openssl')) {
+                return 'You need the openssl extension installed for this check';
+            }
+
+            try {
+                $this->rfs->getContents('api.github.com', $url, false, array('http' => array('request_fulluri' => false)));
+            } catch (TransportException $e) {
+                return 'Unable to assert the situation, maybe github is down ('.$e->getMessage().')';
+            }
+
+            return 'It seems there is a problem with your proxy server, try setting the "HTTP_PROXY_REQUEST_FULLURI" environment variable to "false"';
         }
 
         return true;

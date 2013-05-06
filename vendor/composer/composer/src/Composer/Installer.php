@@ -18,6 +18,7 @@ use Composer\DependencyResolver\Operation\UpdateOperation;
 use Composer\DependencyResolver\Operation\UninstallOperation;
 use Composer\DependencyResolver\Pool;
 use Composer\DependencyResolver\Request;
+use Composer\DependencyResolver\Rule;
 use Composer\DependencyResolver\Solver;
 use Composer\DependencyResolver\SolverProblemsException;
 use Composer\Downloader\DownloadManager;
@@ -173,11 +174,14 @@ class Installer
             $this->downloadManager->setPreferDist(true);
         }
 
-        // create installed repo, this contains all local packages + platform packages (php & extensions)
+        // clone root package to have one in the installed repo that does not require anything
+        // we don't want it to be uninstallable, but its requirements should not conflict
+        // with the lock file for example
         $installedRootPackage = clone $this->package;
         $installedRootPackage->setRequires(array());
         $installedRootPackage->setDevRequires(array());
 
+        // create installed repo, this contains all local packages + platform packages (php & extensions)
         $localRepo = $this->repositoryManager->getLocalRepository();
         $platformRepo = new PlatformRepository();
         $repos = array(
@@ -258,7 +262,7 @@ class Installer
                 $platformDevReqs = $this->devMode ? $this->extractPlatformRequirements($this->package->getDevRequires()) : array();
 
                 $updatedLock = $this->locker->setLockData(
-                    array_diff($localRepo->getPackages(), (array) $devPackages),
+                    array_diff($localRepo->getCanonicalPackages(), (array) $devPackages),
                     $devPackages,
                     $platformReqs,
                     $platformDevReqs,
@@ -489,12 +493,33 @@ class Installer
                 }
             }
 
-            // output alias operations in verbose mode, or all ops in dry run
-            if ($this->dryRun || ($this->verbose && false !== strpos($operation->getJobType(), 'Alias'))) {
+            // output non-alias ops in dry run, output alias ops in debug verbosity
+            if ($this->dryRun && false === strpos($operation->getJobType(), 'Alias')) {
                 $this->io->write('  - ' . $operation);
+                $this->io->write('');
+            } elseif ($this->io->isDebug() && false !== strpos($operation->getJobType(), 'Alias')) {
+                $this->io->write('  - ' . $operation);
+                $this->io->write('');
             }
 
             $this->installationManager->execute($localRepo, $operation);
+
+            // output reasons why the operation was ran, only for install/update operations
+            if ($this->verbose && $this->io->isVeryVerbose() && in_array($operation->getJobType(), array('install', 'update'))) {
+                $reason = $operation->getReason();
+                if ($reason instanceof Rule) {
+                    switch ($reason->getReason()) {
+                        case Rule::RULE_JOB_INSTALL:
+                            $this->io->write('    REASON: Required by root: '.$reason->getRequiredPackage());
+                            $this->io->write('');
+                            break;
+                        case Rule::RULE_PACKAGE_REQUIRES:
+                            $this->io->write('    REASON: '.$reason->getPrettyString());
+                            $this->io->write('');
+                            break;
+                    }
+                }
+            }
 
             $event = 'Composer\Script\ScriptEvents::POST_PACKAGE_'.strtoupper($operation->getJobType());
             if (defined($event) && $this->runScripts) {
@@ -560,13 +585,9 @@ class Installer
             $operations = array();
         }
 
-        foreach ($localRepo->getPackages() as $package) {
+        foreach ($localRepo->getCanonicalPackages() as $package) {
             // skip non-dev packages
             if (!$package->isDev()) {
-                continue;
-            }
-
-            if ($package instanceof AliasPackage) {
                 continue;
             }
 
@@ -687,8 +708,6 @@ class Installer
             foreach ($versions as $version => $alias) {
                 $packages = $platformRepo->findPackages($package, $version);
                 foreach ($packages as $package) {
-                    $package->setAlias($alias['alias_normalized']);
-                    $package->setPrettyAlias($alias['alias']);
                     $aliasPackage = new AliasPackage($package, $alias['alias_normalized'], $alias['alias']);
                     $aliasPackage->setRootPackageAlias(true);
                     $platformRepo->addPackage($aliasPackage);
@@ -811,12 +830,14 @@ class Installer
      */
     private function mockLocalRepositories(RepositoryManager $rm)
     {
-        $packages = array_map(function ($p) {
-            return clone $p;
-        }, $rm->getLocalRepository()->getPackages());
+        $packages = array();
+        foreach ($rm->getLocalRepository()->getPackages() as $package) {
+            $packages[(string) $package] = clone $package;
+        }
         foreach ($packages as $key => $package) {
             if ($package instanceof AliasPackage) {
-                unset($packages[$key]);
+                $alias = (string) $package->getAliasOf();
+                $packages[$key] = new AliasPackage($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
             }
         }
         $rm->setLocalRepository(

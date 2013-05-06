@@ -170,12 +170,14 @@ class Pool
                         $name = $package->getName();
                         if (isset($rootAliases[$name][$package->getVersion()])) {
                             $alias = $rootAliases[$name][$package->getVersion()];
-                            $package->setAlias($alias['alias_normalized']);
-                            $package->setPrettyAlias($alias['alias']);
-                            $package->getRepository()->addPackage($aliasPackage = new AliasPackage($package, $alias['alias_normalized'], $alias['alias']));
+                            if ($package instanceof AliasPackage) {
+                                $package = $package->getAliasOf();
+                            }
+                            $aliasPackage = new AliasPackage($package, $alias['alias_normalized'], $alias['alias']);
                             $aliasPackage->setRootPackageAlias(true);
                             $aliasPackage->setId($this->id++);
 
+                            $package->getRepository()->addPackage($aliasPackage);
                             $this->packages[] = $aliasPackage;
 
                             foreach ($aliasPackage->getNames() as $name) {
@@ -207,9 +209,7 @@ class Pool
     */
     public function packageById($id)
     {
-        $this->ensurePackageIsLoaded($this->packages[$id - 1]);
-
-        return $this->packages[$id - 1];
+        return $this->ensurePackageIsLoaded($this->packages[$id - 1]);
     }
 
     /**
@@ -353,7 +353,8 @@ class Pool
                 $this->packageByName[$name][$data['id']] = $package;
             }
             $package->setId($data['id']);
-            $data = $package;
+
+            return $package;
         }
 
         return $data;

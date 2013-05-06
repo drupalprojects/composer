@@ -71,7 +71,23 @@ class ConsoleIO implements IOInterface
      */
     public function isVerbose()
     {
-        return $this->output->getVerbosity() === OutputInterface::VERBOSITY_VERBOSE;
+        return $this->output->getVerbosity() >= OutputInterface::VERBOSITY_VERBOSE;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isVeryVerbose()
+    {
+        return $this->output->getVerbosity() >= 3; // OutputInterface::VERSOBITY_VERY_VERBOSE
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isDebug()
+    {
+        return $this->output->getVerbosity() >= 4; // OutputInterface::VERBOSITY_DEBUG
     }
 
     /**
@@ -161,7 +177,16 @@ class ConsoleIO implements IOInterface
             // handle code running from a phar
             if ('phar:' === substr(__FILE__, 0, 5)) {
                 $tmpExe = sys_get_temp_dir().'/hiddeninput.exe';
-                copy($exe, $tmpExe);
+
+                // use stream_copy_to_stream instead of copy
+                // to work around https://bugs.php.net/bug.php?id=64634
+                $source = fopen(__DIR__.'\\hiddeninput.exe', 'r');
+                $target = fopen($tmpExe, 'w+');
+                stream_copy_to_stream($source, $target);
+                fclose($source);
+                fclose($target);
+                unset($source, $target);
+
                 $exe = $tmpExe;
             }
 

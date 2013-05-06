@@ -13,6 +13,9 @@
 namespace Composer\Package\Loader;
 
 use Composer\Package;
+use Composer\Package\AliasPackage;
+use Composer\Package\RootAliasPackage;
+use Composer\Package\RootPackageInterface;
 use Composer\Package\Version\VersionParser;
 
 /**
@@ -100,11 +103,6 @@ class ArrayLoader implements LoaderInterface
             $package->setDistSha1Checksum(isset($config['dist']['shasum']) ? $config['dist']['shasum'] : null);
         }
 
-        if ($aliasNormalized = $this->getBranchAlias($config)) {
-            $package->setAlias($aliasNormalized);
-            $package->setPrettyAlias(preg_replace('{(\.9{7})+}', '.x', $aliasNormalized));
-        }
-
         foreach (Package\BasePackage::$supportedLinkTypes as $type => $opts) {
             if (isset($config[$type])) {
                 $method = 'set'.ucfirst($opts['method']);
@@ -184,6 +182,14 @@ class ArrayLoader implements LoaderInterface
 
             if (isset($config['support'])) {
                 $package->setSupport($config['support']);
+            }
+        }
+
+        if ($aliasNormalized = $this->getBranchAlias($config)) {
+            if ($package instanceof RootPackageInterface) {
+                $package = new RootAliasPackage($package, $aliasNormalized, preg_replace('{(\.9{7})+}', '.x', $aliasNormalized));
+            } else {
+                $package = new AliasPackage($package, $aliasNormalized, preg_replace('{(\.9{7})+}', '.x', $aliasNormalized));
             }
         }
 

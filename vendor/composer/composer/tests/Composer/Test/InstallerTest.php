@@ -17,13 +17,13 @@ use Composer\Config;
 use Composer\Json\JsonFile;
 use Composer\Repository\ArrayRepository;
 use Composer\Repository\RepositoryManager;
+use Composer\Repository\InstalledArrayRepository;
 use Composer\Package\RootPackageInterface;
 use Composer\Package\Link;
 use Composer\Package\Locker;
 use Composer\Test\Mock\FactoryMock;
 use Composer\Test\Mock\InstalledFilesystemRepositoryMock;
 use Composer\Test\Mock\InstallationManagerMock;
-use Composer\Test\Mock\WritableRepositoryMock;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\StreamOutput;
 
@@ -53,7 +53,7 @@ class InstallerTest extends TestCase
         $config = $this->getMock('Composer\Config');
 
         $repositoryManager = new RepositoryManager($io, $config);
-        $repositoryManager->setLocalRepository(new WritableRepositoryMock());
+        $repositoryManager->setLocalRepository(new InstalledArrayRepository());
 
         if (!is_array($repositories)) {
             $repositories = array($repositories);
@@ -200,7 +200,9 @@ class InstallerTest extends TestCase
 
         $application = new Application;
         $application->get('install')->setCode(function ($input, $output) use ($installer) {
-            $installer->setDevMode($input->getOption('dev'));
+            $installer
+                ->setDevMode($input->getOption('dev'))
+                ->setDryRun($input->getOption('dry-run'));
 
             return $installer->run() ? 0 : 1;
         });
@@ -209,6 +211,7 @@ class InstallerTest extends TestCase
             $installer
                 ->setDevMode($input->getOption('dev'))
                 ->setUpdate(true)
+                ->setDryRun($input->getOption('dry-run'))
                 ->setUpdateWhitelist($input->getArgument('packages'));
 
             return $installer->run() ? 0 : 1;

@@ -15,6 +15,7 @@ namespace Composer\Test\Package\Version;
 use Composer\Package\Version\VersionParser;
 use Composer\Package\LinkConstraint\MultiConstraint;
 use Composer\Package\LinkConstraint\VersionConstraint;
+use Composer\Package\LinkConstraint\EmptyConstraint;
 use Composer\Package\PackageInterface;
 
 class VersionParserTest extends \PHPUnit_Framework_TestCase
@@ -192,10 +193,10 @@ class VersionParserTest extends \PHPUnit_Framework_TestCase
     public function simpleConstraints()
     {
         return array(
-            'match any'         => array('*',           new MultiConstraint(array())),
-            'match any/2'       => array('*.*',         new MultiConstraint(array())),
-            'match any/3'       => array('*.x.*',       new MultiConstraint(array())),
-            'match any/4'       => array('x.x.x.*',     new MultiConstraint(array())),
+            'match any'         => array('*',           new EmptyConstraint()),
+            'match any/2'       => array('*.*',         new EmptyConstraint()),
+            'match any/3'       => array('*.x.*',       new EmptyConstraint()),
+            'match any/4'       => array('x.x.x.*',     new EmptyConstraint()),
             'not equal'         => array('<>1.0.0',     new VersionConstraint('<>', '1.0.0.0')),
             'not equal/2'       => array('!=1.0.0',     new VersionConstraint('!=', '1.0.0.0')),
             'greater than'      => array('>1.0.0',      new VersionConstraint('>', '1.0.0.0')),
@@ -282,6 +283,17 @@ class VersionParserTest extends \PHPUnit_Framework_TestCase
         $second = new VersionConstraint('<=', '3.0.0.0');
         $multi = new MultiConstraint(array($first, $second));
         $this->assertSame((string) $multi, (string) $parser->parseConstraints('>2.0,<=3.0'));
+    }
+
+    public function testParseConstraintsMultiDisjunctiveHasPrioOverConjuctive()
+    {
+        $parser = new VersionParser;
+        $first = new VersionConstraint('>', '2.0.0.0');
+        $second = new VersionConstraint('<', '2.0.5.0-dev');
+        $third = new VersionConstraint('>', '2.0.6.0');
+        $multi1 = new MultiConstraint(array($first, $second));
+        $multi2 = new MultiConstraint(array($multi1, $third), false);
+        $this->assertSame((string) $multi2, (string) $parser->parseConstraints('>2.0,<2.0.5 | >2.0.6'));
     }
 
     public function testParseConstraintsMultiWithStabilities()

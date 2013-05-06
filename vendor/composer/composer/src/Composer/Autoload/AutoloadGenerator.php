@@ -16,7 +16,7 @@ use Composer\Config;
 use Composer\Installer\InstallationManager;
 use Composer\Package\AliasPackage;
 use Composer\Package\PackageInterface;
-use Composer\Repository\RepositoryInterface;
+use Composer\Repository\InstalledRepositoryInterface;
 use Composer\Util\Filesystem;
 use Composer\Script\EventDispatcher;
 use Composer\Script\ScriptEvents;
@@ -37,7 +37,7 @@ class AutoloadGenerator
         $this->eventDispatcher = $eventDispatcher;
     }
 
-    public function dump(Config $config, RepositoryInterface $localRepo, PackageInterface $mainPackage, InstallationManager $installationManager, $targetDir, $scanPsr0Packages = false, $suffix = '')
+    public function dump(Config $config, InstalledRepositoryInterface $localRepo, PackageInterface $mainPackage, InstallationManager $installationManager, $targetDir, $scanPsr0Packages = false, $suffix = '')
     {
         $filesystem = new Filesystem();
         $filesystem->ensureDirectoryExists($config->get('vendor-dir'));
@@ -66,7 +66,7 @@ return array(
 
 EOF;
 
-        $packageMap = $this->buildPackageMap($installationManager, $mainPackage, $localRepo->getPackages());
+        $packageMap = $this->buildPackageMap($installationManager, $mainPackage, $localRepo->getCanonicalPackages());
         $autoloads = $this->parseAutoloads($packageMap, $mainPackage);
 
         foreach ($autoloads['psr-0'] as $namespace => $paths) {
@@ -186,7 +186,15 @@ EOF;
         }
         file_put_contents($vendorPath.'/autoload.php', $this->getAutoloadFile($vendorPathToTargetDirCode, $suffix));
         file_put_contents($targetDir.'/autoload_real.php', $this->getAutoloadRealFile(true, true, (bool) $includePathFile, $targetDirLoader, $filesCode, $vendorPathCode, $appBaseDirCode, $suffix, $useGlobalIncludePath));
-        copy(__DIR__.'/ClassLoader.php', $targetDir.'/ClassLoader.php');
+
+        // use stream_copy_to_stream instead of copy
+        // to work around https://bugs.php.net/bug.php?id=64634
+        $sourceLoader = fopen(__DIR__.'/ClassLoader.php', 'r');
+        $targetLoader = fopen($targetDir.'/ClassLoader.php', 'w+');
+        stream_copy_to_stream($sourceLoader, $targetLoader);
+        fclose($sourceLoader);
+        fclose($targetLoader);
+        unset($sourceLoader, $targetLoader);
 
         $this->eventDispatcher->dispatch(ScriptEvents::POST_AUTOLOAD_DUMP);
     }
@@ -312,7 +320,7 @@ EOF;
         }
 
         if (preg_match('/\.phar$/', $path)){
-            $baseDir = "'phar://' . '" . $baseDir;
+            $baseDir = "'phar://' . " . $baseDir;
         }
 
         return $baseDir.var_export($path, true);

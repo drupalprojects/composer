@@ -53,6 +53,25 @@ This is a list of common pitfalls on using Composer, and how to avoid them.
    Use: `before_script: COMPOSER_ROOT_VERSION=dev-master composer install` to export
    the variable for the call to composer.
 
+## Need to override a package version
+
+Let say your project depends on package A which in turn depends on a specific
+version of package B (say 0.1) and you need a different version of that
+package - version 0.11.
+
+You can fix this by aliasing version 0.11 to 0.1:
+
+composer.json:
+
+    {
+        require: {
+            "A": "0.2",
+            "B": "0.11 as 0.1"
+        }
+    }
+
+See [aliases](aliases.md) for more information.
+
 ## Memory limit errors
 
 If composer shows memory errors on some commands:

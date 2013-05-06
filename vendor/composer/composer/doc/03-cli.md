@@ -21,6 +21,12 @@ The following options are available with every command:
 * **--no-ansi:** Disable ANSI output.
 * **--version (-V):** Display this application version.
 
+## Process Exit Codes
+
+* **0:** OK
+* **1:** Generic/unknown error code
+* **2:** Dependency solving error code
+
 ## init
 
 In the [Libraries](02-libraries.md) chapter we looked at how to create a
@@ -348,6 +354,11 @@ performance.
   autoloader. This is recommended especially for production, but can take
   a bit of time to run so it is currently not done by default.
 
+## run-script
+
+To run [scripts](articles/scripts.md) manually you can use this command,
+just give it the script name and optionally --no-dev to disable the dev mode.
+
 ## diagnose
 
 If you think you found a bug, or something is behaving strangely, you might
@@ -403,6 +414,12 @@ Using `http_proxy` (lowercased) or even defining both might be preferable since
 some tools like git or curl will only use the lower-cased `http_proxy` version.
 Alternatively you can also define the git proxy using
 `git config --global http.proxy <proxy url>`.
+
+### HTTP_PROXY_REQUEST_FULLURI
+
+If you use a proxy but it does not support the request_fulluri flag, then you
+should set this env var to `false` or `0` to prevent composer from setting the
+request_fulluri option.
 
 ### COMPOSER_HOME
 

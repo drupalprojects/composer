@@ -26,7 +26,7 @@ function drush_composer_run($arguments = array()) {
       // Check if it's a valid option for the given command.
       foreach ($options as $name => $option) {
         // Validate it as a shortcut or option.
-        if (stripos($arg, $option['name']) >= 0 || stripos($arg, $option['shortcut']) >= 0) {
+        if (stripos($arg, $option['name']) === 0 || stripos($arg, $option['shortcut']) === 0) {
           // Append it to the valid argument list.
           $args[] = $arg;
           // Continue on with the next argument.

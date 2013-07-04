@@ -31,9 +31,9 @@ use Symfony\Component\Console\Helper\DialogHelper;
 use Symfony\Component\Console\Helper\ProgressHelper;
 use Symfony\Component\Console\Helper\TableHelper;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
-use Symfony\Component\Console\Event\ConsoleForExceptionEvent;
+use Symfony\Component\Console\Event\ConsoleExceptionEvent;
 use Symfony\Component\Console\Event\ConsoleTerminateEvent;
-use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * An Application is the container for a collection of commands.
@@ -88,7 +88,7 @@ class Application
         }
     }
 
-    public function setDispatcher(EventDispatcher $dispatcher)
+    public function setDispatcher(EventDispatcherInterface $dispatcher)
     {
         $this->dispatcher = $dispatcher;
     }
@@ -115,6 +115,8 @@ class Application
             $output = new ConsoleOutput();
         }
 
+        $this->configureIO($input, $output);
+
         try {
             $exitCode = $this->doRun($input, $output);
         } catch (\Exception $e) {
@@ -127,9 +129,16 @@ class Application
             } else {
                 $this->renderException($e, $output);
             }
-            $exitCode = $e->getCode();
 
-            $exitCode = is_numeric($exitCode) && $exitCode ? $exitCode : 1;
+            $exitCode = $e->getCode();
+            if (is_numeric($exitCode)) {
+                $exitCode = (int) $exitCode;
+                if (0 === $exitCode) {
+                    $exitCode = 1;
+                }
+            } else {
+                $exitCode = 1;
+            }
         }
 
         if ($this->autoExit) {
@@ -154,14 +163,13 @@ class Application
      */
     public function doRun(InputInterface $input, OutputInterface $output)
     {
-        $name = $this->getCommandName($input);
+        if (true === $input->hasParameterOption(array('--version', '-V'))) {
+            $output->writeln($this->getLongVersion());
 
-        if (true === $input->hasParameterOption(array('--ansi'))) {
-            $output->setDecorated(true);
-        } elseif (true === $input->hasParameterOption(array('--no-ansi'))) {
-            $output->setDecorated(false);
+            return 0;
         }
 
+        $name = $this->getCommandName($input);
         if (true === $input->hasParameterOption(array('--help', '-h'))) {
             if (!$name) {
                 $name = 'help';
@@ -169,35 +177,6 @@ class Application
             } else {
                 $this->wantHelps = true;
             }
-        }
-
-        if (true === $input->hasParameterOption(array('--no-interaction', '-n'))) {
-            $input->setInteractive(false);
-        }
-
-        if (function_exists('posix_isatty') && $this->getHelperSet()->has('dialog')) {
-            $inputStream = $this->getHelperSet()->get('dialog')->getInputStream();
-            if (!posix_isatty($inputStream)) {
-                $input->setInteractive(false);
-            }
-        }
-
-        if (true === $input->hasParameterOption(array('--quiet', '-q'))) {
-            $output->setVerbosity(OutputInterface::VERBOSITY_QUIET);
-        } else {
-            if ($input->hasParameterOption('-vvv') || $input->hasParameterOption('--verbose=3') || $input->getParameterOption('--verbose') === 3) {
-                $output->setVerbosity(OutputInterface::VERBOSITY_DEBUG);
-            } elseif ($input->hasParameterOption('-vv') || $input->hasParameterOption('--verbose=2') || $input->getParameterOption('--verbose') === 2) {
-                $output->setVerbosity(OutputInterface::VERBOSITY_VERY_VERBOSE);
-            } elseif ($input->hasParameterOption('-v') || $input->hasParameterOption('--verbose=1') || $input->hasParameterOption('--verbose') || $input->getParameterOption('--verbose')) {
-                $output->setVerbosity(OutputInterface::VERBOSITY_VERBOSE);
-            }
-        }
-
-        if (true === $input->hasParameterOption(array('--version', '-V'))) {
-            $output->writeln($this->getLongVersion());
-
-            return 0;
         }
 
         if (!$name) {
@@ -212,7 +191,7 @@ class Application
         $exitCode = $this->doRunCommand($command, $input, $output);
         $this->runningCommand = null;
 
-        return is_numeric($exitCode) ? $exitCode : 0;
+        return $exitCode;
     }
 
     /**
@@ -865,6 +844,44 @@ class Application
     }
 
     /**
+     * Configures the input and output instances based on the user arguments and options.
+     *
+     * @param InputInterface  $input  An InputInterface instance
+     * @param OutputInterface $output An OutputInterface instance
+     */
+    protected function configureIO(InputInterface $input, OutputInterface $output)
+    {
+        if (true === $input->hasParameterOption(array('--ansi'))) {
+            $output->setDecorated(true);
+        } elseif (true === $input->hasParameterOption(array('--no-ansi'))) {
+            $output->setDecorated(false);
+        }
+
+        if (true === $input->hasParameterOption(array('--no-interaction', '-n'))) {
+            $input->setInteractive(false);
+        }
+
+        if (function_exists('posix_isatty') && $this->getHelperSet()->has('dialog')) {
+            $inputStream = $this->getHelperSet()->get('dialog')->getInputStream();
+            if (!posix_isatty($inputStream)) {
+                $input->setInteractive(false);
+            }
+        }
+
+        if (true === $input->hasParameterOption(array('--quiet', '-q'))) {
+            $output->setVerbosity(OutputInterface::VERBOSITY_QUIET);
+        } else {
+            if ($input->hasParameterOption('-vvv') || $input->hasParameterOption('--verbose=3') || $input->getParameterOption('--verbose') === 3) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_DEBUG);
+            } elseif ($input->hasParameterOption('-vv') || $input->hasParameterOption('--verbose=2') || $input->getParameterOption('--verbose') === 2) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERY_VERBOSE);
+            } elseif ($input->hasParameterOption('-v') || $input->hasParameterOption('--verbose=1') || $input->hasParameterOption('--verbose') || $input->getParameterOption('--verbose')) {
+                $output->setVerbosity(OutputInterface::VERBOSITY_VERBOSE);
+            }
+        }
+    }
+
+    /**
      * Runs the current command.
      *
      * If an event dispatcher has been attached to the application,
@@ -891,7 +908,7 @@ class Application
             $event = new ConsoleTerminateEvent($command, $input, $output, $e->getCode());
             $this->dispatcher->dispatch(ConsoleEvents::TERMINATE, $event);
 
-            $event = new ConsoleForExceptionEvent($command, $input, $output, $e, $event->getExitCode());
+            $event = new ConsoleExceptionEvent($command, $input, $output, $e, $event->getExitCode());
             $this->dispatcher->dispatch(ConsoleEvents::EXCEPTION, $event);
 
             throw $event->getException();

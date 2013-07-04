@@ -17,7 +17,7 @@
   "require": {
     "composer/composer": "1.0.*@alpha"
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "alpha",
   "config": {
       "preferred-install": "dist"
   }

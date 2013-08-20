@@ -28,7 +28,7 @@ class ComposerAutoloaderInitFilesAutoload
 
         $map = require __DIR__ . '/autoload_namespaces.php';
         foreach ($map as $namespace => $path) {
-            $loader->add($namespace, $path);
+            $loader->set($namespace, $path);
         }
 
         $classMap = require __DIR__ . '/autoload_classmap.php';
@@ -38,11 +38,9 @@ class ComposerAutoloaderInitFilesAutoload
 
         $loader->register(true);
 
-        require $vendorDir . '/a/a/test.php';
-        require $vendorDir . '/b/b/test2.php';
-        require $vendorDir . '/c/c/foo/bar/test3.php';
-        require $baseDir . '/root.php';
-        require $vendorDir . '/c/c/foo/bar/test4.php';
+        foreach (require __DIR__ . '/autoload_files.php' as $file) {
+            require $file;
+        }
 
         return $loader;
     }

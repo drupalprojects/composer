@@ -23,6 +23,7 @@ use Composer\Util\RemoteFilesystem;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 use Composer\Script\EventDispatcher;
 use Composer\Autoload\AutoloadGenerator;
+use Composer\Package\Version\VersionParser;
 
 /**
  * Creates a configured instance of composer.
@@ -34,6 +35,7 @@ use Composer\Autoload\AutoloadGenerator;
 class Factory
 {
     /**
+     * @throws \RuntimeException
      * @return Config
      */
     public static function createConfig()
@@ -59,7 +61,7 @@ class Factory
                 if ($cacheDir = getenv('LOCALAPPDATA')) {
                     $cacheDir .= '/Composer';
                 } else {
-                    $cacheDir = getenv('APPDATA') . '/Composer/cache';
+                    $cacheDir = $home . '/cache';
                 }
                 $cacheDir = strtr($cacheDir, '\\', '/');
             } else {
@@ -125,7 +127,7 @@ class Factory
 
     public static function getComposerFile()
     {
-        return trim(getenv('COMPOSER')) ?: 'composer.json';
+        return trim(getenv('COMPOSER')) ?: './composer.json';
     }
 
     public static function createAdditionalStyles()
@@ -175,6 +177,7 @@ class Factory
      * @param array|string|null $localConfig either a configuration array or a filename to read from, if null it will
      *                                       read from the default filename
      * @throws \InvalidArgumentException
+     * @throws \UnexpectedValueException
      * @return Composer
      */
     public function createComposer(IOInterface $io, $localConfig = null)
@@ -189,7 +192,7 @@ class Factory
             $file = new JsonFile($localConfig, new RemoteFilesystem($io));
 
             if (!$file->exists()) {
-                if ($localConfig === 'composer.json') {
+                if ($localConfig === './composer.json' || $localConfig === 'composer.json') {
                     $message = 'Composer could not find a composer.json file in '.getcwd();
                 } else {
                     $message = 'Composer could not find the config file: '.$localConfig;
@@ -205,16 +208,7 @@ class Factory
         // Configuration defaults
         $config = static::createConfig();
         $config->merge($localConfig);
-
-        // reload oauth token from config if available
-        if ($tokens = $config->get('github-oauth')) {
-            foreach ($tokens as $domain => $token) {
-                if (!preg_match('{^[a-z0-9]+$}', $token)) {
-                    throw new \UnexpectedValueException('Your github oauth token for '.$domain.' contains invalid characters: "'.$token.'"');
-                }
-                $io->setAuthentication($domain, $token, 'x-oauth-basic');
-            }
-        }
+        $io->loadConfiguration($config);
 
         $vendorDir = $config->get('vendor-dir');
         $binDir = $config->get('bin-dir');
@@ -229,7 +223,8 @@ class Factory
         $this->addLocalRepository($rm, $vendorDir);
 
         // load package
-        $loader  = new Package\Loader\RootPackageLoader($rm, $config);
+        $parser = new VersionParser;
+        $loader  = new Package\Loader\RootPackageLoader($rm, $config, $parser, new ProcessExecutor($io));
         $package = $loader->load($localConfig);
 
         // initialize download manager
@@ -265,7 +260,7 @@ class Factory
             $lockFile = "json" === pathinfo($composerFile, PATHINFO_EXTENSION)
                 ? substr($composerFile, 0, -4).'lock'
                 : $composerFile . '.lock';
-            $locker = new Package\Locker(new JsonFile($lockFile, new RemoteFilesystem($io)), $rm, $im, md5_file($composerFile));
+            $locker = new Package\Locker($io, new JsonFile($lockFile, new RemoteFilesystem($io)), $rm, $im, md5_file($composerFile));
             $composer->setLocker($locker);
         }
 
@@ -314,6 +309,19 @@ class Factory
         }
 
         $dm = new Downloader\DownloadManager();
+        switch ($config->get('preferred-install')) {
+            case 'dist':
+                $dm->setPreferDist(true);
+                break;
+            case 'source':
+                $dm->setPreferSource(true);
+                break;
+            case 'auto':
+            default:
+                // noop
+                break;
+        }
+
         $dm->setDownloader('git', new Downloader\GitDownloader($io, $config));
         $dm->setDownloader('svn', new Downloader\SvnDownloader($io, $config));
         $dm->setDownloader('hg', new Downloader\HgDownloader($io, $config));
@@ -326,15 +334,17 @@ class Factory
     }
 
     /**
-     * @param Config                     $config  The configuration
-     * @param Downloader\DownloadManager $dm      Manager use to download sources
+     * @param Config                     $config The configuration
+     * @param Downloader\DownloadManager $dm     Manager use to download sources
      *
      * @return Archiver\ArchiveManager
      */
     public function createArchiveManager(Config $config, Downloader\DownloadManager $dm = null)
     {
         if (null === $dm) {
-            $dm = $this->createDownloadManager(new IO\NullIO(), $config);
+            $io = new IO\NullIO();
+            $io->loadConfiguration($config);
+            $dm = $this->createDownloadManager($io, $config);
         }
 
         $am = new Archiver\ArchiveManager($dm);

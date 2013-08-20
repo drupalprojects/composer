@@ -79,11 +79,8 @@ resolution.
 * **--dry-run:** If you want to run through an installation without actually
   installing a package, you can use `--dry-run`. This will simulate the
   installation and show you what would happen.
-* **--dev:** By default composer will only install required packages. By
-  passing this option you can also make it install packages referenced by
-  `require-dev`.
-* **--no-dev:** Skip installing packages listed in `require-dev` (this is
-  the default for `install`).
+* **--dev:** Install packages listed in `require-dev` (this is the default behavior).
+* **--no-dev:** Skip installing packages listed in `require-dev`.
 * **--no-scripts:** Skips execution of scripts defined in `composer.json`.
 * **--no-custom-installers:** Disables custom installers.
 * **--no-progress:** Removes the progress display that can mess with some
@@ -115,7 +112,7 @@ You can also use wildcards to update a bunch of packages at once:
 * **--prefer-source:** Install packages from `source` when available.
 * **--prefer-dist:** Install packages from `dist` when available.
 * **--dry-run:** Simulate the command without actually doing anything.
-* **--dev:** Install packages listed in `require-dev` (this is the default for `update`).
+* **--dev:** Install packages listed in `require-dev` (this is the default behavior).
 * **--no-dev:** Skip installing packages listed in `require-dev`.
 * **--no-scripts:** Skips execution of scripts defined in `composer.json`.
 * **--no-custom-installers:** Disables custom installers.
@@ -124,6 +121,8 @@ You can also use wildcards to update a bunch of packages at once:
 * **--optimize-autoloader (-o):** Convert PSR-0 autoloading to classmap to get a faster
   autoloader. This is recommended especially for production, but can take
   a bit of time to run so it is currently not done by default.
+* **--lock:** Only updates the lock file hash to suppress warning about the
+  lock file being out of date
 
 ## require
 
@@ -148,6 +147,24 @@ to the command.
 * **--no-update:** Disables the automatic update of the dependencies.
 * **--no-progress:** Removes the progress display that can mess with some
   terminals or scripts which don't handle backspace characters.
+
+## global
+
+The global command allows you to run other commands like `install`, `require`
+or `update` as if you were running them from the [COMPOSER_HOME](#COMPOSER_HOME)
+directory.
+
+This can be used to install CLI utilities globally and if you add
+`$COMPOSER_HOME/vendor/bin` to your `$PATH` environment variable. Here is an
+example:
+
+    $ php composer.phar global require fabpot/php-cs-fixer:dev-master
+
+Now the `php-cs-fixer` binary is available globally (assuming you adjusted
+your PATH). If you wish to update the binary later on you can just run a
+global update:
+
+    $ php composer.phar global update
 
 ## search
 
@@ -315,6 +332,9 @@ If the directory does not currently exist, it will be created during installatio
 
     php composer.phar create-project doctrine/orm path 2.2.0
 
+It is also possible to run the command without params in a directory with an
+existing `composer.json` file to bootstrap a project.
+
 By default the command checks for the packages on packagist.org.
 
 ### Options
@@ -354,6 +374,11 @@ performance.
   autoloader. This is recommended especially for production, but can take
   a bit of time to run so it is currently not done by default.
 
+## licenses
+
+Lists the name, version and license of every package installed. Use
+`--format=json` to get machine readable output.
+
 ## run-script
 
 To run [scripts](articles/scripts.md) manually you can use this command,
@@ -377,8 +402,8 @@ To get more information about a certain command, just use `help`.
 
 You can set a number of environment variables that override certain settings.
 Whenever possible it is recommended to specify these settings in the `config`
-section of `composer.json` instead. It is worth noting that that the env vars
-will always take precedence over the values specified in `composer.json`.
+section of `composer.json` instead. It is worth noting that the env vars will
+always take precedence over the values specified in `composer.json`.
 
 ### COMPOSER
 
@@ -415,11 +440,27 @@ some tools like git or curl will only use the lower-cased `http_proxy` version.
 Alternatively you can also define the git proxy using
 `git config --global http.proxy <proxy url>`.
 
+### no_proxy
+
+If you are behind a proxy and would like to disable it for certain domains, you
+can use the `no_proxy` env var. Simply set it to a comma separated list of
+domains the proxy should *not* be used for.
+
+The env var accepts domains, IP addresses, and IP address blocks in CIDR
+notation. You can restrict the filter to a particular port (e.g. `:80`). You
+can also set it to `*` to ignore the proxy for all HTTP requests.
+
 ### HTTP_PROXY_REQUEST_FULLURI
 
 If you use a proxy but it does not support the request_fulluri flag, then you
 should set this env var to `false` or `0` to prevent composer from setting the
 request_fulluri option.
+
+### HTTPS_PROXY_REQUEST_FULLURI
+
+If you use a proxy but it does not support the request_fulluri flag for HTTPS
+requests, then you should set this env var to `false` or `0` to prevent composer
+from setting the request_fulluri option.
 
 ### COMPOSER_HOME
 
@@ -427,7 +468,7 @@ The `COMPOSER_HOME` var allows you to change the composer home directory. This
 is a hidden, global (per-user on the machine) directory that is shared between
 all projects.
 
-By default it points to `/home/<user>/.composer` on *nix,
+By default it points to `/home/<user>/.composer` on \*nix,
 `/Users/<user>/.composer` on OSX and
 `C:\Users\<user>\AppData\Roaming\Composer` on Windows.
 
@@ -442,6 +483,14 @@ This file allows you to set [configuration](04-schema.md#config) and
 
 In case global configuration matches _local_ configuration, the _local_
 configuration in the project's `composer.json` always wins.
+
+### COMPOSER_CACHE_DIR
+
+The `COMPOSER_CACHE_DIR` var allows you to change the composer cache directory,
+which is also configurable via the [`cache-dir`](04-schema.md#config) option.
+
+By default it points to $COMPOSER_HOME/cache on \*nix and OSX, and
+`C:\Users\<user>\AppData\Local\Composer` (or `%LOCALAPPDATA%/Composer`) on Windows.
 
 ### COMPOSER_PROCESS_TIMEOUT
 

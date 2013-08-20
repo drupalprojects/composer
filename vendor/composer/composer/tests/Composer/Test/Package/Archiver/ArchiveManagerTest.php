@@ -13,9 +13,7 @@
 namespace Composer\Test\Package\Archiver;
 
 use Composer\Factory;
-use Composer\IO\NullIO;
 use Composer\Package\Archiver;
-use Composer\Package\Archiver\ArchiveManager;
 use Composer\Package\PackageInterface;
 
 class ArchiveManagerTest extends ArchiverTest
@@ -51,6 +49,9 @@ class ArchiveManagerTest extends ArchiverTest
 
         $target = $this->getTargetName($package, 'tar');
         $this->assertFileExists($target);
+        
+        $tmppath = sys_get_temp_dir().'/composer_archiver/'.$this->manager->getPackageFilename($package);
+        $this->assertFileNotExists($tmppath);
 
         unlink($target);
     }

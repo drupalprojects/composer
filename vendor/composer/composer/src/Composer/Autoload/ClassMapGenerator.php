@@ -12,6 +12,7 @@
  */
 
 namespace Composer\Autoload;
+use Symfony\Component\Finder\Finder;
 
 /**
  * ClassMapGenerator
@@ -53,7 +54,7 @@ class ClassMapGenerator
             if (is_file($path)) {
                 $path = array(new \SplFileInfo($path));
             } elseif (is_dir($path)) {
-                $path = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path));
+                $path = Finder::create()->files()->followLinks()->name('/\.(php|inc)$/')->in($path);
             } else {
                 throw new \RuntimeException(
                     'Could not scan for classes inside "'.$path.
@@ -65,10 +66,6 @@ class ClassMapGenerator
         $map = array();
 
         foreach ($path as $file) {
-            if (!$file->isFile()) {
-                continue;
-            }
-
             $filePath = $file->getRealPath();
 
             if (!in_array(pathinfo($filePath, PATHINFO_EXTENSION), array('php', 'inc'))) {
@@ -84,7 +81,6 @@ class ClassMapGenerator
             foreach ($classes as $class) {
                 $map[$class] = $filePath;
             }
-
         }
 
         return $map;
@@ -93,9 +89,9 @@ class ClassMapGenerator
     /**
      * Extract the classes in the given file
      *
-     * @param string $path The file to check
-     *
-     * @return array The found classes
+     * @param  string            $path The file to check
+     * @throws \RuntimeException
+     * @return array             The found classes
      */
     private static function findClasses($path)
     {
@@ -108,14 +104,14 @@ class ClassMapGenerator
         }
 
         // return early if there is no chance of matching anything in this file
-        if (!preg_match('{\b(?:class|interface'.$traits.')\b}i', $contents)) {
+        if (!preg_match('{\b(?:class|interface'.$traits.')\s}i', $contents)) {
             return array();
         }
 
         // strip heredocs/nowdocs
         $contents = preg_replace('{<<<\'?(\w+)\'?(?:\r\n|\n|\r)(?:.*?)(?:\r\n|\n|\r)\\1(?=\r\n|\n|\r|;)}s', 'null', $contents);
         // strip strings
-        $contents = preg_replace('{"[^"\\\\]*(\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(\\\\.[^\'\\\\]*)*\'}', 'null', $contents);
+        $contents = preg_replace('{"[^"\\\\]*(\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(\\\\.[^\'\\\\]*)*\'}s', 'null', $contents);
         // strip leading non-php code if needed
         if (substr($contents, 0, 2) !== '<?') {
             $contents = preg_replace('{^.+?<\?}s', '<?', $contents);

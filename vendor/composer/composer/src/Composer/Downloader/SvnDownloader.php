@@ -41,6 +41,10 @@ class SvnDownloader extends VcsDownloader
         $url = $target->getSourceUrl();
         $ref = $target->getSourceReference();
 
+        if (!is_dir($path.'/.svn')) {
+            throw new \RuntimeException('The .svn directory is missing from '.$path.', see http://getcomposer.org/commit-deps for more information');
+        }
+
         $this->io->write("    Checking out " . $ref);
         $this->execute($url, "svn switch", sprintf("%s/%s", $url, $ref), $path);
     }
@@ -48,7 +52,7 @@ class SvnDownloader extends VcsDownloader
     /**
      * {@inheritDoc}
      */
-    public function getLocalChanges($path)
+    public function getLocalChanges(PackageInterface $package, $path)
     {
         if (!is_dir($path.'/.svn')) {
             return;
@@ -63,12 +67,12 @@ class SvnDownloader extends VcsDownloader
      * Execute an SVN command and try to fix up the process with credentials
      * if necessary.
      *
-     * @param string $baseUrl Base URL of the repository
-     * @param string $command SVN command to run
-     * @param string $url     SVN url
-     * @param string $cwd     Working directory
-     * @param string $path    Target for a checkout
-     *
+     * @param  string            $baseUrl Base URL of the repository
+     * @param  string            $command SVN command to run
+     * @param  string            $url     SVN url
+     * @param  string            $cwd     Working directory
+     * @param  string            $path    Target for a checkout
+     * @throws \RuntimeException
      * @return string
      */
     protected function execute($baseUrl, $command, $url, $cwd = null, $path = null)
@@ -86,9 +90,9 @@ class SvnDownloader extends VcsDownloader
     /**
      * {@inheritDoc}
      */
-    protected function cleanChanges($path, $update)
+    protected function cleanChanges(PackageInterface $package, $path, $update)
     {
-        if (!$changes = $this->getLocalChanges($path)) {
+        if (!$changes = $this->getLocalChanges($package, $path)) {
             return;
         }
 
@@ -97,7 +101,7 @@ class SvnDownloader extends VcsDownloader
                 return $this->discardChanges($path);
             }
 
-            return parent::cleanChanges($path, $update);
+            return parent::cleanChanges($package, $path, $update);
         }
 
         $changes = array_map(function ($elem) {
@@ -144,9 +148,9 @@ class SvnDownloader extends VcsDownloader
         $fromRevision = preg_replace('{.*@(\d+)$}', '$1', $fromReference);
         $toRevision = preg_replace('{.*@(\d+)$}', '$1', $toReference);
 
-        $command = sprintf('cd %s && svn log -r%s:%s --incremental', escapeshellarg($path), $fromRevision, $toRevision);
+        $command = sprintf('svn log -r%s:%s --incremental', $fromRevision, $toRevision);
 
-        if (0 !== $this->process->execute($command, $output)) {
+        if (0 !== $this->process->execute($command, $output, $path)) {
             throw new \RuntimeException('Failed to execute ' . $command . "\n\n" . $this->process->getErrorOutput());
         }
 

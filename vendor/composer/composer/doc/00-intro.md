@@ -19,9 +19,9 @@ The problem that Composer solves is this:
 
 a) You have a project that depends on a number of libraries.
 
-b) Some of those libraries depend on other libraries .
+b) Some of those libraries depend on other libraries.
 
-c) You declare the things you depend on
+c) You declare the things you depend on.
 
 d) Composer finds out which versions of which packages need to be installed, and
    installs them (meaning it downloads them into your project).
@@ -108,8 +108,10 @@ composer.phar:
 
     C:\Users\username>cd C:\bin
     C:\bin>php -r "eval('?>'.file_get_contents('https://getcomposer.org/installer'));"
+    
+> **Note:** If the above fails due to file_get_contents, use the `http` url or enable php_openssl.dll in php.ini
 
-Create a new `.bat` file alongside composer:
+Create a new `composer.bat` file alongside `composer.phar`:
 
     C:\bin>echo @php "%~dp0composer.phar" %*>composer.bat
 

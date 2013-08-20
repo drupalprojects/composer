@@ -15,7 +15,9 @@ namespace Composer\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Composer\Downloader\ChangeReportInterface;
 use Composer\Downloader\VcsDownloader;
+use Composer\Script\ScriptEvents;
 
 /**
  * @author Tiago Ribeiro <tiago.ribeiro@seegno.com>
@@ -49,16 +51,19 @@ EOT
         $dm = $composer->getDownloadManager();
         $im = $composer->getInstallationManager();
 
+        // Dispatch pre-status-command
+        $composer->getEventDispatcher()->dispatchCommandEvent(ScriptEvents::PRE_STATUS_CMD, true);
+
         $errors = array();
 
         // list packages
         foreach ($installedRepo->getPackages() as $package) {
             $downloader = $dm->getDownloaderForInstalledPackage($package);
 
-            if ($downloader instanceof VcsDownloader) {
+            if ($downloader instanceof ChangeReportInterface) {
                 $targetDir = $im->getInstallPath($package);
 
-                if ($changes = $downloader->getLocalChanges($targetDir)) {
+                if ($changes = $downloader->getLocalChanges($package, $targetDir)) {
                     $errors[$targetDir] = $changes;
                 }
             }
@@ -86,6 +91,9 @@ EOT
         if ($errors && !$input->getOption('verbose')) {
             $output->writeln('Use --verbose (-v) to see modified files');
         }
+
+        // Dispatch post-status-command
+        $composer->getEventDispatcher()->dispatchCommandEvent(ScriptEvents::POST_STATUS_CMD, true);
 
         return $errors ? 1 : 0;
     }

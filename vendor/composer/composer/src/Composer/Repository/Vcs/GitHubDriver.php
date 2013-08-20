@@ -87,7 +87,6 @@ class GitHubDriver extends VcsDriver
         if ($this->gitDriver) {
             return $this->gitDriver->getSource($identifier);
         }
-        $label = array_search($identifier, $this->getTags()) ?: $identifier;
         if ($this->isPrivate) {
             // Private GitHub repositories should be accessed using the
             // SSH version of the URL.
@@ -96,7 +95,7 @@ class GitHubDriver extends VcsDriver
             $url = $this->getUrl();
         }
 
-        return array('type' => 'git', 'url' => $url, 'reference' => $label);
+        return array('type' => 'git', 'url' => $url, 'reference' => $identifier);
     }
 
     /**
@@ -107,10 +106,9 @@ class GitHubDriver extends VcsDriver
         if ($this->gitDriver) {
             return $this->gitDriver->getDist($identifier);
         }
-        $label = array_search($identifier, $this->getTags()) ?: $identifier;
-        $url = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/zipball/'.$label;
+        $url = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/zipball/'.$identifier;
 
-        return array('type' => 'zip', 'url' => $url, 'reference' => $label, 'shasum' => '');
+        return array('type' => 'zip', 'url' => $url, 'reference' => $identifier, 'shasum' => '');
     }
 
     /**
@@ -127,18 +125,25 @@ class GitHubDriver extends VcsDriver
         }
 
         if (!isset($this->infoCache[$identifier])) {
-            try {
-                $resource = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/contents/composer.json?ref='.urlencode($identifier);
-                $composer = JsonFile::parseJson($this->getContents($resource));
-                if (empty($composer['content']) || $composer['encoding'] !== 'base64' || !($composer = base64_decode($composer['content']))) {
-                    throw new \RuntimeException('Could not retrieve composer.json from '.$resource);
-                }
-            } catch (TransportException $e) {
-                if (404 !== $e->getCode()) {
-                    throw $e;
-                }
+            $notFoundRetries = 2;
+            while ($notFoundRetries) {
+                try {
+                    $resource = 'https://api.github.com/repos/'.$this->owner.'/'.$this->repository.'/contents/composer.json?ref='.urlencode($identifier);
+                    $composer = JsonFile::parseJson($this->getContents($resource));
+                    if (empty($composer['content']) || $composer['encoding'] !== 'base64' || !($composer = base64_decode($composer['content']))) {
+                        throw new \RuntimeException('Could not retrieve composer.json from '.$resource);
+                    }
+                    break;
+                } catch (TransportException $e) {
+                    if (404 !== $e->getCode()) {
+                        throw $e;
+                    }
 
-                $composer = false;
+                    // TODO should be removed when possible
+                    // retry fetching if github returns a 404 since they happen randomly
+                    $notFoundRetries--;
+                    $composer = false;
+                }
             }
 
             if ($composer) {
@@ -297,7 +302,12 @@ class GitHubDriver extends VcsDriver
                     }
 
                     if ($rateLimited) {
-                        $this->io->write('<error>GitHub API limit exhausted. You are already authorized so you will have to wait a while before doing more requests</error>');
+                        $rateLimit = $this->getRateLimit($e->getHeaders());
+                        $this->io->write(sprintf(
+                            '<error>GitHub API limit (%d calls/hr) is exhausted. You are already authorized so you have to wait until %s before doing more requests</error>',
+                            $rateLimit['limit'],
+                            $rateLimit['reset']
+                        ));
                     }
 
                     throw $e;
@@ -306,6 +316,39 @@ class GitHubDriver extends VcsDriver
                     throw $e;
             }
         }
+    }
+
+    /**
+     * Extract ratelimit from response.
+     *
+     * @param array $headers Headers from Composer\Downloader\TransportException.
+     *
+     * @return array Associative array with the keys limit and reset.
+     */
+    protected function getRateLimit(array $headers)
+    {
+        $rateLimit = array(
+            'limit' => '?',
+            'reset' => '?',
+        );
+
+        foreach ($headers as $header) {
+            $header = trim($header);
+            if (false === strpos($header, 'X-RateLimit-')) {
+                continue;
+            }
+            list($type, $value) = explode(':', $header, 2);
+            switch ($type) {
+                case 'X-RateLimit-Limit':
+                    $rateLimit['limit'] = (int) trim($value);
+                    break;
+                case 'X-RateLimit-Reset':
+                    $rateLimit['reset'] = date('Y-m-d H:i:s', (int) trim($value));
+                    break;
+            }
+        }
+
+        return $rateLimit;
     }
 
     /**

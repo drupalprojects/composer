@@ -85,7 +85,10 @@ class RemoteFilesystem
      * @param string  $fileName          the local filename
      * @param boolean $progress          Display the progression
      *
-     * @throws TransportException When the file could not be downloaded
+     * @throws TransportException|\Exception
+     * @throws TransportException            When the file could not be downloaded
+     *
+     * @return bool|string
      */
     protected function get($originUrl, $fileUrl, $additionalOptions = array(), $fileName = null, $progress = true)
     {
@@ -96,15 +99,21 @@ class RemoteFilesystem
         $this->progress = $progress;
         $this->lastProgress = null;
 
+        // capture username/password from URL if there is one
+        if (preg_match('{^https?://(.+):(.+)@([^/]+)}i', $fileUrl, $match)) {
+            $this->io->setAuthentication($originUrl, urldecode($match[1]), urldecode($match[2]));
+        }
+
         $options = $this->getOptionsForUrl($originUrl, $additionalOptions);
+
         if ($this->io->isDebug()) {
-            $this->io->write('Downloading '.$fileUrl);
+            $this->io->write((substr($fileUrl, 0, 4) === 'http' ? 'Downloading ' : 'Reading ') . $fileUrl);
         }
         if (isset($options['github-token'])) {
             $fileUrl .= (false === strpos($fileUrl, '?') ? '?' : '&') . 'access_token='.$options['github-token'];
             unset($options['github-token']);
         }
-        $ctx = StreamContextFactory::getContext($options, array('notification' => array($this, 'callbackGet')));
+        $ctx = StreamContextFactory::getContext($fileUrl, $options, array('notification' => array($this, 'callbackGet')));
 
         if ($this->progress) {
             $this->io->write("    Downloading: <comment>connection...</comment>", false);
@@ -207,12 +216,13 @@ class RemoteFilesystem
     /**
      * Get notification action.
      *
-     * @param integer $notificationCode The notification code
-     * @param integer $severity         The severity level
-     * @param string  $message          The message
-     * @param integer $messageCode      The message code
-     * @param integer $bytesTransferred The loaded size
-     * @param integer $bytesMax         The total size
+     * @param  integer            $notificationCode The notification code
+     * @param  integer            $severity         The severity level
+     * @param  string             $message          The message
+     * @param  integer            $messageCode      The message code
+     * @param  integer            $bytesTransferred The loaded size
+     * @param  integer            $bytesMax         The total size
+     * @throws TransportException
      */
     protected function callbackGet($notificationCode, $severity, $message, $messageCode, $bytesTransferred, $bytesMax)
     {

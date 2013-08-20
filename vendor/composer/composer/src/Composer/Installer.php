@@ -15,7 +15,9 @@ namespace Composer;
 use Composer\Autoload\AutoloadGenerator;
 use Composer\DependencyResolver\DefaultPolicy;
 use Composer\DependencyResolver\Operation\UpdateOperation;
+use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\DependencyResolver\Operation\UninstallOperation;
+use Composer\DependencyResolver\Operation\OperationInterface;
 use Composer\DependencyResolver\Pool;
 use Composer\DependencyResolver\Request;
 use Composer\DependencyResolver\Rule;
@@ -459,6 +461,8 @@ class Installer
             $this->io->write('Nothing to install or update');
         }
 
+        $operations = $this->moveCustomInstallersToFront($operations);
+
         foreach ($operations as $operation) {
             // collect suggestions
             if ('install' === $operation->getJobType()) {
@@ -534,6 +538,41 @@ class Installer
         return true;
     }
 
+
+    /**
+     * Workaround: if your packages depend on custom installers, we must be sure
+     * that those are installed / updated first; else it would lead to packages
+     * being installed multiple times in different folders, when running Composer
+     * twice.
+     *
+     * While this does not fix the root-causes of https://github.com/composer/composer/issues/1147,
+     * it at least fixes the symptoms and makes usage of composer possible (again)
+     * in such scenarios.
+     *
+     * @param OperationInterface[] $operations
+     * @return OperationInterface[] reordered operation list
+     */
+    private function moveCustomInstallersToFront(array $operations)
+    {
+        $installerOps = array();
+        foreach ($operations as $idx => $op) {
+            if ($op instanceof InstallOperation) {
+                $package = $op->getPackage();
+            } else if ($op instanceof UpdateOperation) {
+                $package = $op->getTargetPackage();
+            } else {
+                continue;
+            }
+
+            if ($package->getRequires() === array() && $package->getType() === 'composer-installer') {
+                $installerOps[] = $op;
+                unset($operations[$idx]);
+            }
+        }
+
+        return array_merge($installerOps, $operations);
+    }
+
     private function createPool()
     {
         $minimumStability = $this->package->getMinimumStability();
@@ -560,12 +599,21 @@ class Installer
         $constraint->setPrettyString($rootPackage->getPrettyVersion());
         $request->install($rootPackage->getName(), $constraint);
 
-        // fix the version of all platform packages to prevent the solver trying to remove those
-        foreach ($platformRepo->getPackages() as $package) {
+        $fixedPackages = $platformRepo->getPackages();
+        if ($this->additionalInstalledRepository) {
+            $additionalFixedPackages = $this->additionalInstalledRepository->getPackages();
+            $fixedPackages = array_merge($fixedPackages, $additionalFixedPackages);
+        }
+
+        // fix the version of all platform packages + additionally installed packages
+        // to prevent the solver trying to remove or update those
+        $provided = $rootPackage->getProvides();
+        foreach ($fixedPackages as $package) {
             $constraint = new VersionConstraint('=', $package->getVersion());
             $constraint->setPrettyString($package->getPrettyVersion());
 
-            if (!($provided = $rootPackage->getProvides())
+            // skip platform packages that are provided by the root package
+            if ($package->getRepository() !== $platformRepo
                 || !isset($provided[$package->getName()])
                 || !$provided[$package->getName()]->getConstraint()->matches($constraint)
             ) {
@@ -733,7 +781,8 @@ class Installer
         return false;
     }
 
-    private function extractPlatformRequirements($links) {
+    private function extractPlatformRequirements($links)
+    {
         $platformReqs = array();
         foreach ($links as $link) {
             if (preg_match(PlatformRepository::PLATFORM_PACKAGE_REGEX, $link->getTarget())) {
@@ -848,8 +897,8 @@ class Installer
     /**
      * Create Installer
      *
-     * @param  IOInterface       $io
-     * @param  Composer          $composer
+     * @param  IOInterface $io
+     * @param  Composer    $composer
      * @return Installer
      */
     public static function create(IOInterface $io, Composer $composer)

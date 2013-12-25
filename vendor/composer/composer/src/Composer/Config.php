@@ -35,6 +35,8 @@ class Config
         'cache-files-ttl' => null, // fallback to cache-ttl
         'cache-files-maxsize' => '300MiB',
         'discard-changes' => false,
+        'prepend-autoloader' => true,
+        'github-domains' => array('github.com'),
     );
 
     public static $defaultRepositories = array(

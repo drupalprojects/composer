@@ -73,7 +73,14 @@ class NoProxyPattern
                 if (strpos($ruleHost, '/') === false) {
                     $match = $ip === $ruleHost;
                 } else {
-                    $match = self::inCIDRBlock($ruleHost, $ip);
+                    // gethostbyname() failed to resolve $host to an ip, so we assume
+                    // it must be proxied to let the proxy's DNS resolve it
+                    if ($ip === $host) {
+                        $match = false;
+                    } else {
+                        // match resolved IP against the rule
+                        $match = self::inCIDRBlock($ruleHost, $ip);
+                    }
                 }
             } else {
                 // match end of domain
@@ -105,7 +112,7 @@ class NoProxyPattern
      * http://framework.zend.com/svn/framework/extras/incubator/library/ZendX/Whois/Adapter/Cidr.php
      *
      * @param string $cidr IPv4 block in CIDR notation
-     * @param string $ip IPv4 address
+     * @param string $ip   IPv4 address
      *
      * @return boolean
      */

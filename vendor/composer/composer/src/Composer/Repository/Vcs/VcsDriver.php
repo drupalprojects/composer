@@ -101,8 +101,21 @@ abstract class VcsDriver implements VcsDriverInterface
         return $this->remoteFilesystem->getContents($this->originUrl, $url, false);
     }
 
+    /**
+     * Return if current repository url is local
+     *
+     * @return boolean Repository url is local
+     */
     protected static function isLocalUrl($url)
     {
         return (bool) preg_match('{^(file://|/|[a-z]:[\\\\/])}i', $url);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function cleanup()
+    {
+        return;
     }
 }

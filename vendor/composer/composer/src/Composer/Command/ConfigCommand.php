@@ -117,7 +117,7 @@ EOT
         if ($input->getOption('global') && !$this->configFile->exists()) {
             touch($this->configFile->getPath());
             $this->configFile->write(array('config' => new \ArrayObject));
-            chmod($this->configFile->getPath(), 0600);
+            @chmod($this->configFile->getPath(), 0600);
         }
 
         if (!$this->configFile->exists()) {
@@ -300,6 +300,18 @@ EOT
                         if (!in_array($val, array('git', 'https'))) {
                             return 'valid protocols include: git, https';
                         }
+                    }
+
+                    return true;
+                },
+                function ($vals) {
+                    return $vals;
+                }
+            ),
+            'github-domains' => array(
+                function ($vals) {
+                    if (!is_array($vals)) {
+                        return 'array expected';
                     }
 
                     return true;

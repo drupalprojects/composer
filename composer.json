@@ -15,9 +15,8 @@
     "source": "http://drupalcode.org/project/composer.git"
   },
   "require": {
-    "composer/composer": "1.0.*@dev"
+    "composer/composer": "1.0.0-alpha8"
   },
-  "minimum-stability": "alpha",
   "config": {
       "preferred-install": "dist"
   }

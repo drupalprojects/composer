@@ -173,6 +173,12 @@ class Installer
         unset($devRepo, $package);
         // end BC
 
+        if ($this->runScripts) {
+            // dispatch pre event
+            $eventName = $this->update ? ScriptEvents::PRE_UPDATE_CMD : ScriptEvents::PRE_INSTALL_CMD;
+            $this->eventDispatcher->dispatchCommandEvent($eventName, $this->devMode);
+        }
+
         $this->downloadManager->setPreferSource($this->preferSource);
         $this->downloadManager->setPreferDist($this->preferDist);
 
@@ -198,12 +204,6 @@ class Installer
 
         $aliases = $this->getRootAliases();
         $this->aliasPlatformPackages($platformRepo, $aliases);
-
-        if ($this->runScripts) {
-            // dispatch pre event
-            $eventName = $this->update ? ScriptEvents::PRE_UPDATE_CMD : ScriptEvents::PRE_INSTALL_CMD;
-            $this->eventDispatcher->dispatchCommandEvent($eventName, $this->devMode);
-        }
 
         try {
             $this->suggestedPackages = array();
@@ -242,7 +242,7 @@ class Installer
                 // split dev and non-dev requirements by checking what would be removed if we update without the dev requirements
                 if ($this->devMode && $this->package->getDevRequires()) {
                     $policy = $this->createPolicy();
-                    $pool = $this->createPool();
+                    $pool = $this->createPool(true);
                     $pool->addRepository($installedRepo, $aliases);
 
                     // creating requirements request
@@ -325,7 +325,7 @@ class Installer
 
         // creating repository pool
         $policy = $this->createPolicy();
-        $pool = $this->createPool();
+        $pool = $this->createPool($withDevReqs);
         $pool->addRepository($installedRepo, $aliases);
         if ($installFromLock) {
             $pool->addRepository($lockedRepository, $aliases);
@@ -573,7 +573,7 @@ class Installer
         return array_merge($installerOps, $operations);
     }
 
-    private function createPool()
+    private function createPool($withDevReqs)
     {
         $minimumStability = $this->package->getMinimumStability();
         $stabilityFlags = $this->package->getStabilityFlags();
@@ -583,7 +583,16 @@ class Installer
             $stabilityFlags = $this->locker->getStabilityFlags();
         }
 
-        return new Pool($minimumStability, $stabilityFlags);
+        $requires = $this->package->getRequires();
+        if ($withDevReqs) {
+            $requires = array_merge($requires, $this->package->getDevRequires());
+        }
+        $rootConstraints = array();
+        foreach ($requires as $req => $constraint) {
+            $rootConstraints[$req] = $constraint->getConstraint();
+        }
+
+        return new Pool($minimumStability, $stabilityFlags, $rootConstraints);
     }
 
     private function createPolicy()
@@ -835,7 +844,7 @@ class Installer
 
             $depPackages = $pool->whatProvides($packageName);
             if (count($depPackages) == 0 && !in_array($packageName, $requiredPackageNames) && !in_array($packageName, array('nothing', 'lock'))) {
-                $this->io->write('<warning>Package "' . $packageName . '" listed for update is not installed. Ignoring.<warning>');
+                $this->io->write('<warning>Package "' . $packageName . '" listed for update is not installed. Ignoring.</warning>');
             }
 
             foreach ($depPackages as $depPackage) {

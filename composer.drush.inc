@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Drush wrapper around the Composer package management system.
+ * Use Composer, the PHP package management system, from Drush.
  *
  * @author Rob Loach (http://robloach.net)
  */

@@ -1,30 +1,26 @@
-Drush Composer
-==============
+# Drush Composer
 
 Drush wrapper for [Composer](http://getcomposer.org).
 
 
-Installation
-------------
+## Installation
 
-    $ drush dl composer-8.x-1.x
-
-
-Usage
------
-
-    $ drush composer
+    drush dl composer-8.x-1.x
 
 
-Develop
--------
+## Usage
+
+    drush composer
+
+
+## Develop
 
 To update Composer and all dependencies, run:
 
-    $ curl -sS https://getcomposer.org/installer | php
-    $ php composer.phar update
+    curl -sS https://getcomposer.org/installer | php
+    php composer.phar update
 
 
 To re-build the `composer.drush.json` file, run the following:
 
-    $ vendor/bin/composer list --format=json > composer.drush.json
+    vendor/bin/composer list --format=json > composer.drush.json

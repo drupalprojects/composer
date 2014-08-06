@@ -1,6 +1,6 @@
 {
   "name": "drupal/composer",
-  "description": "Drush wrapper around Composer, the PHP package management system.",
+  "description": "Use Composer, the PHP package management system, from Drush.",
   "homepage": "http://drupal.org/project/composer",
   "license": "GPL-2.0",
   "type": "drupal-drush",

@@ -23,4 +23,4 @@ To update Composer and all dependencies, run:
 
 To re-build the `composer.drush.json` file, run the following:
 
-    vendor/bin/composer list --format=json > composer.drush.json
+    vendor/composer/composer/bin/composer list --format=json > composer.drush.json

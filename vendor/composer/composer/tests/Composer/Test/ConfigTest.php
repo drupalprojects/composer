@@ -21,7 +21,7 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
      */
     public function testAddPackagistRepository($expected, $localConfig, $systemConfig = null)
     {
-        $config = new Config();
+        $config = new Config(false);
         if ($systemConfig) {
             $config->merge(array('repositories' => $systemConfig));
         }
@@ -102,16 +102,28 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
 
     public function testMergeGithubOauth()
     {
-        $config = new Config();
+        $config = new Config(false);
         $config->merge(array('config' => array('github-oauth' => array('foo' => 'bar'))));
         $config->merge(array('config' => array('github-oauth' => array('bar' => 'baz'))));
 
         $this->assertEquals(array('foo' => 'bar', 'bar' => 'baz'), $config->get('github-oauth'));
     }
 
+    public function testVarReplacement()
+    {
+        $config = new Config(false);
+        $config->merge(array('config' => array('a' => 'b', 'c' => '{$a}')));
+        $config->merge(array('config' => array('bin-dir' => '$HOME', 'cache-dir' => '~/foo/')));
+
+        $home = rtrim(getenv('HOME') ?: getenv('USERPROFILE'), '\\/');
+        $this->assertEquals('b', $config->get('c'));
+        $this->assertEquals($home.'/', $config->get('bin-dir'));
+        $this->assertEquals($home.'/foo', $config->get('cache-dir'));
+    }
+
     public function testOverrideGithubProtocols()
     {
-        $config = new Config();
+        $config = new Config(false);
         $config->merge(array('config' => array('github-protocols' => array('https', 'git'))));
         $config->merge(array('config' => array('github-protocols' => array('https'))));
 

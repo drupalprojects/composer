@@ -114,6 +114,19 @@ bar"}');
         }
     }
 
+    public function testErrorAtBeginning()
+    {
+        $parser = new JsonParser();
+        try {
+            $parser->parse('
+
+');
+            $this->fail('Empty string should be invalid');
+        } catch (ParsingException $e) {
+            $this->assertContains("Parse error on line 1:\n\n^", $e->getMessage());
+        }
+    }
+
     public function testParsesMultiInARow()
     {
         $parser = new JsonParser();
@@ -171,6 +184,15 @@ bar"}');
                 $this->objectHasAttribute('_empty_.1')
             )
         );
+    }
+
+    public function testParseToArray()
+    {
+        $parser = new JsonParser();
+
+        $json = '{"one":"a", "two":{"three": "four"}, "": "empty"}';
+        $result = $parser->parse($json, JsonParser::PARSE_TO_ASSOC);
+        $this->assertSame(json_decode($json, true), $result);
     }
 
     public function testFileWithBOM()

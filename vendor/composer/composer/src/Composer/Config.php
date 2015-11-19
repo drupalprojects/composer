@@ -36,6 +36,7 @@ class Config
         'cache-ttl' => 15552000, // 6 months
         'cache-files-ttl' => null, // fallback to cache-ttl
         'cache-files-maxsize' => '300MiB',
+        'bin-compat' => 'auto',
         'discard-changes' => false,
         'autoloader-suffix' => null,
         'optimize-autoloader' => false,
@@ -44,6 +45,9 @@ class Config
         'github-domains' => array('github.com'),
         'github-expose-hostname' => true,
         'store-auths' => 'prompt',
+        'platform' => array(),
+        'archive-format' => 'tar',
+        'archive-dir' => '.',
         // valid keys without defaults (auth config stuff):
         // github-oauth
         // http-basic
@@ -54,7 +58,7 @@ class Config
             'type' => 'composer',
             'url' => 'https?://packagist.org',
             'allow_ssl_downgrade' => true,
-        )
+        ),
     );
 
     private $config;
@@ -65,7 +69,7 @@ class Config
     private $useEnvironment;
 
     /**
-     * @param boolean $useEnvironment Use COMPOSER_ environment variables to replace config settings
+     * @param bool $useEnvironment Use COMPOSER_ environment variables to replace config settings
      */
     public function __construct($useEnvironment = true, $baseDir = null)
     {
@@ -177,7 +181,7 @@ class Config
                     return $val;
                 }
 
-                return ($flags & self::RELATIVE_PATHS == 1) ? $val : $this->realpath($val);
+                return ($flags & self::RELATIVE_PATHS == self::RELATIVE_PATHS) ? $val : $this->realpath($val);
 
             case 'cache-ttl':
                 return (int) $this->config[$key];
@@ -214,6 +218,17 @@ class Config
 
             case 'home':
                 return rtrim($this->process($this->config[$key], $flags), '/\\');
+
+            case 'bin-compat':
+                $value = $this->getComposerEnv('COMPOSER_BIN_COMPAT') ?: $this->config[$key];
+
+                if (!in_array($value, array('auto', 'full'))) {
+                    throw new \RuntimeException(
+                        "Invalid value for 'bin-compat': {$value}. Expected auto, full"
+                    );
+                }
+
+                return $value;
 
             case 'discard-changes':
                 if ($env = $this->getComposerEnv('COMPOSER_DISCARD_CHANGES')) {
@@ -328,8 +343,8 @@ class Config
      * This should be used to read COMPOSER_ environment variables
      * that overload config values.
      *
-     * @param  string         $var
-     * @return string|boolean
+     * @param  string      $var
+     * @return string|bool
      */
     private function getComposerEnv($var)
     {

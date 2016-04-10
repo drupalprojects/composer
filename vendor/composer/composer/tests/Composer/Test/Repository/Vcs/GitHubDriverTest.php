@@ -14,19 +14,22 @@ namespace Composer\Test\Repository\Vcs;
 
 use Composer\Downloader\TransportException;
 use Composer\Repository\Vcs\GitHubDriver;
+use Composer\TestCase;
 use Composer\Util\Filesystem;
 use Composer\Config;
 
-class GitHubDriverTest extends \PHPUnit_Framework_TestCase
+class GitHubDriverTest extends TestCase
 {
+    private $home;
     private $config;
 
     public function setUp()
     {
+        $this->home = $this->getUniqueTmpDirectory();
         $this->config = new Config();
         $this->config->merge(array(
             'config' => array(
-                'home' => sys_get_temp_dir() . '/composer-test',
+                'home' => $this->home,
             ),
         ));
     }
@@ -34,7 +37,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
     public function tearDown()
     {
         $fs = new Filesystem;
-        $fs->removeDirectory(sys_get_temp_dir() . '/composer-test');
+        $fs->removeDirectory($this->home);
     }
 
     public function testPrivateRepository()
@@ -75,7 +78,7 @@ class GitHubDriverTest extends \PHPUnit_Framework_TestCase
 
         $remoteFilesystem->expects($this->at(1))
             ->method('getContents')
-            ->with($this->equalTo('github.com'), $this->equalTo('https://api.github.com/rate_limit'), $this->equalTo(false))
+            ->with($this->equalTo('github.com'), $this->equalTo('https://api.github.com/'), $this->equalTo(false))
             ->will($this->returnValue('{}'));
 
         $remoteFilesystem->expects($this->at(2))

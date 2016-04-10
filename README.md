@@ -18,7 +18,7 @@ Drush wrapper for [Composer](http://getcomposer.org).
 To update Composer and all dependencies, run:
 
     curl -sS https://getcomposer.org/installer | php
-    php composer.phar update --prefer-dist --no-dev
+    php composer.phar update --prefer-dist --no-dev --optimize-autoloader
 
 
 To re-build the `composer.drush.json` file, run the following:

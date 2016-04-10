@@ -15,7 +15,7 @@ namespace Composer\Repository;
 use Composer\Package\AliasPackage;
 use Composer\Package\PackageInterface;
 use Composer\Package\CompletePackageInterface;
-use Composer\Semver\VersionParser;
+use Composer\Package\Version\VersionParser;
 use Composer\Semver\Constraint\ConstraintInterface;
 use Composer\Semver\Constraint\Constraint;
 
@@ -24,7 +24,7 @@ use Composer\Semver\Constraint\Constraint;
  *
  * @author Nils Adermann <naderman@naderman.de>
  */
-class ArrayRepository implements RepositoryInterface
+class ArrayRepository extends BaseRepository
 {
     /** @var PackageInterface[] */
     protected $packages;

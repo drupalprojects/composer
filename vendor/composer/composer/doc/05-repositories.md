@@ -264,7 +264,7 @@ package, you should do so in the default (often master) branch and not in a
 feature branch, since the package name is taken from the default branch.
 
 Also note that the override will not work if you change the `name` property
-in your forked repository's composer.json file as this needs to match the
+in your forked repository's `composer.json` file as this needs to match the
 original for the override to work.
 
 If other dependencies rely on the package you forked, it is possible to
@@ -550,7 +550,7 @@ repository.
 ### Toran Proxy
 
 [Toran Proxy](https://toranproxy.com/) is a web app much like Packagist but
-providing private package hosting as well as mirroring/proxying of GitHub and 
+providing private package hosting as well as mirroring/proxying of GitHub and
 packagist.org. Check its homepage and the [Satis/Toran Proxy article](articles/handling-private-packages-with-satis.md)
 for more information.
 
@@ -634,10 +634,42 @@ file, you can use the following configuration:
         }
     ],
     "require": {
-        "my/package": "*@dev"
+        "my/package": "*"
     }
 }
 ```
+
+If the package is a local VCS repository, the version may be inferred by
+the branch or tag that is currently checked out. Otherwise, the version should
+be explicitly defined in the package's `composer.json` file. If the version
+cannot be resolved by these means, it is assumed to be `dev-master`.
+
+The local package will be symlinked if possible, in which case the output in
+the console will read `Symlinked from ../../packages/my-package`. If symlinking
+is _not_ possible the package will be copied. In that case, the console will
+output `Mirrored from ../../packages/my-package`.
+
+Instead of default fallback strategy you can force to use symlink with `"symlink": true` or
+mirroring with `"symlink": false` option.
+Forcing mirroring can be useful when deploying or generating package from a monolithic repository.
+
+```json
+{
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../packages/my-package",
+            "options": {
+                "symlink": false
+            }
+        }
+    ]
+}
+```
+
+
+
+Instead of using a relative path, an absolute path can also be used.
 
 > **Note:** Repository paths can also contain wildcards like ``*`` and ``?``.
 > For details, see the [PHP glob function](http://php.net/glob).

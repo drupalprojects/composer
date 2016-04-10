@@ -14,6 +14,8 @@ namespace Composer\Command;
 
 use Composer\Factory;
 use Composer\Package\Loader\ValidatingArrayLoader;
+use Composer\Plugin\CommandEvent;
+use Composer\Plugin\PluginEvents;
 use Composer\Util\ConfigValidator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -26,7 +28,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @author Robert Schönthal <seroscho@googlemail.com>
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
-class ValidateCommand extends Command
+class ValidateCommand extends BaseCommand
 {
     /**
      * configure
@@ -89,7 +91,7 @@ EOT
         $composer = Factory::create($io, $file);
         $locker = $composer->getLocker();
         if ($locker->isLocked() && !$locker->isFresh()) {
-            $lockErrors[] = 'The lock file is not up to date with the latest changes in composer.json.';
+            $lockErrors[] = 'The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `composer update`.';
         }
 
         $this->outputResult($io, $file, $errors, $warnings, $checkPublish, $publishErrors, $checkLock, $lockErrors, true);
@@ -110,6 +112,10 @@ EOT
                 }
             }
         }
+
+        $commandEvent = new CommandEvent(PluginEvents::COMMAND, 'validate', $input, $output);
+        $eventCode = $composer->getEventDispatcher()->dispatch($commandEvent->getName(), $commandEvent);
+        $exitCode = max($eventCode, $exitCode);
 
         return $exitCode;
     }

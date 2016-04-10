@@ -15,6 +15,7 @@ namespace Composer\Command;
 use Composer\DependencyResolver\Pool;
 use Composer\Json\JsonFile;
 use Composer\Factory;
+use Composer\Repository\RepositoryFactory;
 use Composer\Package\BasePackage;
 use Composer\Package\Version\VersionParser;
 use Composer\Package\Version\VersionSelector;
@@ -31,7 +32,7 @@ use Symfony\Component\Process\ExecutableFinder;
  * @author Justin Rainbow <justin.rainbow@gmail.com>
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
-class InitCommand extends Command
+class InitCommand extends BaseCommand
 {
     /** @var CompositeRepository */
     protected $repos;
@@ -61,6 +62,7 @@ class InitCommand extends Command
                 new InputOption('require-dev', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or "foo/bar 1.0.0"'),
                 new InputOption('stability', 's', InputOption::VALUE_REQUIRED, 'Minimum stability (empty or one of: '.implode(', ', array_keys(BasePackage::$stabilities)).')'),
                 new InputOption('license', 'l', InputOption::VALUE_REQUIRED, 'License of package'),
+                new InputOption('repository', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Add custom repositories, either by URL or using JSON arrays'),
             ))
             ->setHelp(<<<EOT
 The <info>init</info> command creates a basic composer.json file
@@ -78,13 +80,22 @@ EOT
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $whitelist = array('name', 'description', 'author', 'type', 'homepage', 'require', 'require-dev', 'stability', 'license');
+        $io = $this->getIO();
 
+        $whitelist = array('name', 'description', 'author', 'type', 'homepage', 'require', 'require-dev', 'stability', 'license');
         $options = array_filter(array_intersect_key($input->getOptions(), array_flip($whitelist)));
 
         if (isset($options['author'])) {
             $options['authors'] = $this->formatAuthors($options['author']);
             unset($options['author']);
+        }
+
+        $repositories = $input->getOption('repository');
+        if ($repositories) {
+            $config = Factory::createConfig($io);
+            foreach ($repositories as $repo) {
+                $options['repositories'][] = RepositoryFactory::configFromString($io, $config, $repo);
+            }
         }
 
         if (isset($options['stability'])) {
@@ -106,7 +117,6 @@ EOT
 
         $file = new JsonFile('composer.json');
         $json = $file->encode($options);
-        $io = $this->getIO();
 
         if ($input->isInteractive()) {
             $io->writeError(array('', $json, ''));
@@ -145,6 +155,23 @@ EOT
         $io = $this->getIO();
         $formatter = $this->getHelperSet()->get('formatter');
 
+        // initialize repos if configured
+        $repositories = $input->getOption('repository');
+        if ($repositories) {
+            $config = Factory::createConfig($io);
+            $repos = array(new PlatformRepository);
+            foreach ($repositories as $repo) {
+                $repos[] = RepositoryFactory::fromString($io, $config, $repo);
+            }
+            $repos[] = RepositoryFactory::createRepo($io, $config, array(
+                'type' => 'composer',
+                'url' => 'https://packagist.org',
+            ));
+
+            $this->repos = new CompositeRepository($repos);
+            unset($repos, $config, $repositories);
+        }
+
         $io->writeError(array(
             '',
             $formatter->formatBlock('Welcome to the Composer config generator', 'bg=blue;fg=white', true),
@@ -174,6 +201,7 @@ EOT
                 // package names must be in the format foo/bar
                 $name = $name . '/' . $name;
             }
+            $name = strtolower($name);
         } else {
             if (!preg_match('{^[a-z0-9_.-]+/[a-z0-9_.-]+$}', $name)) {
                 throw new \InvalidArgumentException(
@@ -217,8 +245,11 @@ EOT
 
         $self = $this;
         $author = $io->askAndValidate(
-            'Author [<comment>'.$author.'</comment>]: ',
+            'Author [<comment>'.$author.'</comment>, n to skip]: ',
             function ($value) use ($self, $author) {
+                if ($value === 'n' || $value === 'no') {
+                    return;
+                }
                 $value = $value ?: $author;
                 $author = $self->parseAuthorString($value);
 
@@ -314,7 +345,7 @@ EOT
         if (!$this->repos) {
             $this->repos = new CompositeRepository(array_merge(
                 array(new PlatformRepository),
-                Factory::createDefaultRepositories($this->getIO())
+                RepositoryFactory::defaultRepos($this->getIO())
             ));
         }
 
@@ -602,6 +633,12 @@ EOT
         $package = $versionSelector->findBestCandidate($name, null, $phpVersion);
 
         if (!$package) {
+            // Check whether the PHP version was the problem
+            if ($phpVersion && $versionSelector->findBestCandidate($name)) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Could not find package %s at any version matching your PHP version %s', $name, $phpVersion
+                ));
+            }
             throw new \InvalidArgumentException(sprintf(
                 'Could not find package %s at any version for your minimum-stability (%s). Check the package spelling or your minimum-stability',
                 $name,

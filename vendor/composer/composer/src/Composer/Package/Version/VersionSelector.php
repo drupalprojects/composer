@@ -17,8 +17,6 @@ use Composer\Package\BasePackage;
 use Composer\Package\PackageInterface;
 use Composer\Package\Loader\ArrayLoader;
 use Composer\Package\Dumper\ArrayDumper;
-use Composer\Semver\VersionParser as SemverVersionParser;
-use Composer\Semver\Semver;
 use Composer\Semver\Constraint\Constraint;
 
 /**
@@ -57,6 +55,7 @@ class VersionSelector
             $phpConstraint = new Constraint('==', $this->getParser()->normalize($targetPhpVersion));
             $candidates = array_filter($candidates, function ($pkg) use ($phpConstraint) {
                 $reqs = $pkg->getRequires();
+
                 return !isset($reqs['php']) || $reqs['php']->getConstraint()->matches($phpConstraint);
             });
         }
@@ -159,7 +158,7 @@ class VersionSelector
     private function getParser()
     {
         if ($this->parser === null) {
-            $this->parser = new SemverVersionParser();
+            $this->parser = new VersionParser();
         }
 
         return $this->parser;

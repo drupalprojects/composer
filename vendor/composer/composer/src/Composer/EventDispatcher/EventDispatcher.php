@@ -145,6 +145,21 @@ class EventDispatcher
      */
     protected function doDispatch(Event $event)
     {
+        $pathStr = 'PATH';
+        if (!isset($_SERVER[$pathStr]) && isset($_SERVER['Path'])) {
+            $pathStr = 'Path';
+        }
+
+        // add the bin dir to the PATH to make local binaries of deps usable in scripts
+        $binDir = $this->composer->getConfig()->get('bin-dir');
+        if (is_dir($binDir)) {
+            $binDir = realpath($binDir);
+            if (isset($_SERVER[$pathStr]) && !preg_match('{(^|'.PATH_SEPARATOR.')'.preg_quote($binDir).'($|'.PATH_SEPARATOR.')}', $_SERVER[$pathStr])) {
+                $_SERVER[$pathStr] = $binDir.PATH_SEPARATOR.getenv($pathStr);
+                putenv($pathStr.'='.$_SERVER[$pathStr]);
+            }
+        }
+
         $listeners = $this->getListeners($event);
 
         $this->pushEvent($event);
@@ -155,9 +170,7 @@ class EventDispatcher
                 $event = $this->checkListenerExpectedEvent($callable, $event);
                 $return = false === call_user_func($callable, $event) ? 1 : 0;
             } elseif ($this->isComposerScript($callable)) {
-                if ($this->io->isVerbose()) {
-                    $this->io->writeError(sprintf('> %s: %s', $event->getName(), $callable));
-                }
+                $this->io->writeError(sprintf('> %s: %s', $event->getName(), $callable), true, IOInterface::VERBOSE);
                 $scriptName = substr($callable, 1);
                 $args = $event->getArguments();
                 $flags = $event->getFlags();
@@ -276,7 +289,7 @@ class EventDispatcher
      * @param Callable $listener  A callable expecting an event argument
      * @param int      $priority  A higher value represents a higher priority
      */
-    protected function addListener($eventName, $listener, $priority = 0)
+    public function addListener($eventName, $listener, $priority = 0)
     {
         $this->listeners[$eventName][$priority][] = $listener;
     }

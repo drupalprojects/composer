@@ -14,6 +14,7 @@ namespace Composer\Downloader;
 
 use Composer\Package\PackageInterface;
 use Symfony\Component\Finder\Finder;
+use Composer\IO\IOInterface;
 
 /**
  * Base downloader for archives
@@ -34,9 +35,7 @@ abstract class ArchiveDownloader extends FileDownloader
         while ($retries--) {
             $fileName = parent::download($package, $path);
 
-            if ($this->io->isVerbose()) {
-                $this->io->writeError('    Extracting archive');
-            }
+            $this->io->writeError('    Extracting archive', true, IOInterface::VERBOSE);
 
             try {
                 $this->filesystem->ensureDirectoryExists($temporaryDir);
@@ -44,7 +43,7 @@ abstract class ArchiveDownloader extends FileDownloader
                     $this->extract($fileName, $temporaryDir);
                 } catch (\Exception $e) {
                     // remove cache if the file was corrupted
-                    parent::clearCache($package, $path);
+                    parent::clearLastCacheWrite($package);
                     throw $e;
                 }
 

@@ -14,15 +14,20 @@ namespace Composer\Util;
 
 use Composer\Config;
 use Composer\IO\IOInterface;
+use Composer\Downloader\TransportException;
 
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
 class Git
 {
+    /** @var IOInterface */
     protected $io;
+    /** @var Config */
     protected $config;
+    /** @var ProcessExecutor */
     protected $process;
+    /** @var Filesystem */
     protected $filesystem;
 
     public function __construct(IOInterface $io, Config $config, ProcessExecutor $process, Filesystem $fs)
@@ -35,6 +40,9 @@ class Git
 
     public function runCommand($commandCallable, $url, $cwd, $initialClone = false)
     {
+        // Ensure we are allowed to use this URL by config
+        $this->config->prohibitUrlByConfig($url);
+
         if ($initialClone) {
             $origCwd = $cwd;
             $cwd = null;
@@ -56,21 +64,20 @@ class Git
         if (!is_array($protocols)) {
             throw new \RuntimeException('Config value "github-protocols" must be an array, got '.gettype($protocols));
         }
-
         // public github, autoswitch protocols
         if (preg_match('{^(?:https?|git)://'.self::getGitHubDomainsRegex($this->config).'/(.*)}', $url, $match)) {
             $messages = array();
             foreach ($protocols as $protocol) {
                 if ('ssh' === $protocol) {
-                    $url = "git@" . $match[1] . ":" . $match[2];
+                    $protoUrl = "git@" . $match[1] . ":" . $match[2];
                 } else {
-                    $url = $protocol ."://" . $match[1] . "/" . $match[2];
+                    $protoUrl = $protocol ."://" . $match[1] . "/" . $match[2];
                 }
 
-                if (0 === $this->process->execute(call_user_func($commandCallable, $url), $ignoredOutput, $cwd)) {
+                if (0 === $this->process->execute(call_user_func($commandCallable, $protoUrl), $ignoredOutput, $cwd)) {
                     return;
                 }
-                $messages[] = '- ' . $url . "\n" . preg_replace('#^#m', '  ', $this->process->getErrorOutput());
+                $messages[] = '- ' . $protoUrl . "\n" . preg_replace('#^#m', '  ', $this->process->getErrorOutput());
                 if ($initialClone) {
                     $this->filesystem->removeDirectory($origCwd);
                 }
@@ -84,6 +91,8 @@ class Git
         $bypassSshForGitHub = preg_match('{^git@'.self::getGitHubDomainsRegex($this->config).':(.+?)\.git$}i', $url) && !in_array('ssh', $protocols, true);
 
         $command = call_user_func($commandCallable, $url);
+
+        $auth = null;
         if ($bypassSshForGitHub || 0 !== $this->process->execute($command, $ignoredOutput, $cwd)) {
             // private github repository without git access, try https with auth
             if (preg_match('{^git@'.self::getGitHubDomainsRegex($this->config).':(.+?)\.git$}i', $url, $match)) {
@@ -98,9 +107,38 @@ class Git
 
                 if ($this->io->hasAuthentication($match[1])) {
                     $auth = $this->io->getAuthentication($match[1]);
-                    $url = 'https://'.rawurlencode($auth['username']) . ':' . rawurlencode($auth['password']) . '@'.$match[1].'/'.$match[2].'.git';
+                    $authUrl = 'https://' . rawurlencode($auth['username']) . ':' . rawurlencode($auth['password']) . '@' . $match[1] . '/' . $match[2] . '.git';
+                    $command = call_user_func($commandCallable, $authUrl);
+                    if (0 === $this->process->execute($command, $ignoredOutput, $cwd)) {
+                        return;
+                    }
+                }
+            } elseif (preg_match('{^https://(bitbucket.org)/(.*)}', $url, $match)) { //bitbucket oauth
+                $bitbucketUtil = new Bitbucket($this->io, $this->config, $this->process);
 
-                    $command = call_user_func($commandCallable, $url);
+                if (!$this->io->hasAuthentication($match[1])) {
+                    $message = 'Enter your Bitbucket credentials to access private repos';
+
+                    if (!$bitbucketUtil->authorizeOAuth($match[1]) && $this->io->isInteractive()) {
+                        $bitbucketUtil->authorizeOAuthInteractively($match[1], $message);
+                        $token = $bitbucketUtil->getToken();
+                        $this->io->setAuthentication($match[1], 'x-token-auth', $token['access_token']);
+                    }
+                } else { //We're authenticating with a locally stored consumer.
+                    $auth = $this->io->getAuthentication($match[1]);
+
+                    //We already have an access_token from a previous request.
+                    if($auth['username'] !== 'x-token-auth') {
+                        $token = $bitbucketUtil->requestToken($match[1], $auth['username'], $auth['password']);
+                        $this->io->setAuthentication($match[1], 'x-token-auth', $token['access_token']);
+                    }
+                }
+
+                if ($this->io->hasAuthentication($match[1])) {
+                    $auth = $this->io->getAuthentication($match[1]);
+                    $authUrl = 'https://' . rawurlencode($auth['username']) . ':' . rawurlencode($auth['password']) . '@' . $match[1] . '/' . $match[2] . '.git';
+
+                    $command = call_user_func($commandCallable, $authUrl);
                     if (0 === $this->process->execute($command, $ignoredOutput, $cwd)) {
                         return;
                     }
@@ -132,9 +170,9 @@ class Git
                 }
 
                 if ($auth) {
-                    $url = $match[1].rawurlencode($auth['username']).':'.rawurlencode($auth['password']).'@'.$match[2].$match[3];
+                    $authUrl = $match[1].rawurlencode($auth['username']).':'.rawurlencode($auth['password']).'@'.$match[2].$match[3];
 
-                    $command = call_user_func($commandCallable, $url);
+                    $command = call_user_func($commandCallable, $authUrl);
                     if (0 === $this->process->execute($command, $ignoredOutput, $cwd)) {
                         $this->io->setAuthentication($match[2], $auth['username'], $auth['password']);
                         $authHelper = new AuthHelper($this->io, $this->config);

@@ -57,7 +57,7 @@ abstract class BaseChannelReader
             throw new \UnexpectedValueException('The PEAR channel at ' . $url . ' did not respond.');
         }
 
-        return $content;
+        return str_replace('http://pear.php.net/rest/', 'https://pear.php.net/rest/', $content);
     }
 
     /**
@@ -74,7 +74,6 @@ abstract class BaseChannelReader
         $xml = simplexml_load_string($this->requestContent($origin, $path), "SimpleXMLElement", LIBXML_NOERROR);
 
         if (false == $xml) {
-            $url = rtrim($origin, '/') . '/' . ltrim($path, '/');
             throw new \UnexpectedValueException(sprintf('The PEAR channel at ' . $origin . ' is broken. (Invalid XML at file `%s`)', $path));
         }
 

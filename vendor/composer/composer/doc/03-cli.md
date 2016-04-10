@@ -50,6 +50,11 @@ php composer.phar init
   in format `foo/bar:1.0.0`.
 * **--require-dev:** Development requirements, see **--require**.
 * **--stability (-s):** Value for the `minimum-stability` field.
+* **--repository:** Provide one (or more) custom repositories. They will be stored
+  in the generated composer.json, and used for auto-completion when prompting for
+  the list of requires. Every repository can be either an HTTP URL pointing
+  to a `composer` repository or a JSON string which similar to what the
+  [repositories](04-schema.md#repositories) key accepts.
 
 ## install
 
@@ -147,6 +152,7 @@ php composer.phar update vendor/*
 * **--lock:** Only updates the lock file hash to suppress warning about the
   lock file being out of date.
 * **--with-dependencies:** Add also all dependencies of whitelisted packages to the whitelist.
+* **--root-reqs:** Restricts the update to your first degree dependencies.
 * **--prefer-stable:** Prefer stable versions of dependencies.
 * **--prefer-lowest:** Prefer lowest versions of dependencies. Useful for testing minimal
   versions of requirements, generally used with `--prefer-stable`.
@@ -225,6 +231,9 @@ The global command allows you to run other commands like `install`, `require`
 or `update` as if you were running them from the [COMPOSER_HOME](#composer-home)
 directory.
 
+This is merely a helper to manage a project stored in a central location that
+can hold CLI tools or Composer plugins that you want to have available everywhere.
+
 This can be used to install CLI utilities globally and if you add
 `$COMPOSER_HOME/vendor/bin` to your `$PATH` environment variable. Here is an
 example:
@@ -299,6 +308,7 @@ php composer.phar show monolog/monolog 1.0.2
 * **--installed (-i):** List the packages that are installed.
 * **--platform (-p):** List only platform packages (php & extensions).
 * **--self (-s):** List the root package info.
+* **--tree (-t):** List the dependencies as a tree. Only usable when giving a single package name or combined with `-i`.
 
 ## browse / home
 
@@ -315,8 +325,13 @@ Lists all packages suggested by currently installed set of packages. You can
 optionally pass one or multiple package names in the format of `vendor/package`
 to limit output to suggestions made by those packages only.
 
+Use the `--by-package` or `--by-suggestion` flags to group the output by
+the package offering the suggestions or the suggested packages respectively.
+
 ### Options
 
+* **--by-package:** Groups output by suggesting package.
+* **--by-suggestion:** Groups output by suggested package.
 * **--no-dev:** Excludes suggestions from `require-dev` packages.
 * **--verbose (-v):** Increased verbosity adds suggesting package name and
   reason for suggestion.
@@ -324,23 +339,67 @@ to limit output to suggestions made by those packages only.
 ## depends
 
 The `depends` command tells you which other packages depend on a certain
-package. You can specify which link types (`require`, `require-dev`)
-should be included in the listing. By default both are used.
+package. As with installation `require-dev` relationships are only considered
+for the root package.
 
 ```sh
-php composer.phar depends --link-type=require monolog/monolog
+php composer.phar depends doctrine/lexer
+ doctrine/annotations v1.2.7 requires doctrine/lexer (1.*)
+ doctrine/common      v2.6.1 requires doctrine/lexer (1.*)
+```
 
-nrk/monolog-fluent
-poc/poc
-propel/propel
-symfony/monolog-bridge
-symfony/symfony
+You can optionally specify a version constraint after the package to limit the
+search.
+
+Add the `--tree` or `-t` flag to show a recursive tree of why the package is
+depended upon, for example:
+
+```sh
+php composer.phar depends psr/log -t
+psr/log 1.0.0 Common interface for logging libraries
+|- aboutyou/app-sdk 2.6.11 (requires psr/log 1.0.*)
+|  `- __root__ (requires aboutyou/app-sdk ^2.6)
+|- monolog/monolog 1.17.2 (requires psr/log ~1.0)
+|  `- laravel/framework v5.2.16 (requires monolog/monolog ~1.11)
+|     `- __root__ (requires laravel/framework ^5.2)
+`- symfony/symfony v3.0.2 (requires psr/log ~1.0)
+   `- __root__ (requires symfony/symfony ^3.0)
 ```
 
 ### Options
 
-* **--link-type:** The link types to match on, can be specified multiple
-  times.
+* **--recursive (-r):** Recursively resolves up to the root package.
+* **--tree (-t):** Prints the results as a nested tree, implies -r.
+
+## prohibits
+
+The `prohibits` command tells you which packages are blocking a given package
+from being installed. Specify a version constraint to verify whether upgrades
+can be performed in your project, and if not why not. See the following
+example:
+
+```sh
+php composer.phar prohibits symfony/symfony 3.1
+ laravel/framework v5.2.16 requires symfony/var-dumper (2.8.*|3.0.*)
+```
+
+Note that you can also specify platform requirements, for example to check
+whether you can upgrade your server to PHP 8.0:
+
+```sh
+php composer.phar prohibits php:8
+ doctrine/cache        v1.6.0 requires php (~5.5|~7.0)
+ doctrine/common       v2.6.1 requires php (~5.5|~7.0)
+ doctrine/instantiator 1.0.5  requires php (>=5.3,<8.0-DEV)
+```
+
+As with `depends` you can request a recursive lookup, which will list all
+packages depending on the packages that cause the conflict.
+
+### Options
+
+* **--recursive (-r):** Recursively resolves up to the root package.
+* **--tree (-t):** Prints the results as a nested tree, implies -r.
 
 ## validate
 
@@ -398,7 +457,7 @@ If you have installed Composer for your entire system (see [global installation]
 you may have to run the command with `root` privileges
 
 ```sh
-sudo composer self-update
+sudo -H composer self-update
 ```
 
 ### Options
@@ -410,7 +469,7 @@ sudo composer self-update
 ## config
 
 The `config` command allows you to edit some basic Composer settings in either
-the local composer.json file or the global config.json file.
+the local `composer.json` file or the global `config.json` file.
 
 ```sh
 php composer.phar config --list
@@ -451,6 +510,12 @@ changes to the repositories section by using it the following way:
 php composer.phar config repositories.foo vcs https://github.com/foo/bar
 ```
 
+If your repository requires more configuration options, you can instead pass its JSON representation :
+
+```sh
+php composer.phar config repositories.foo '{"type": "vcs", "url": "http://svn.example.org/my-project/", "trunk-path": "master"}'
+```
+
 ## create-project
 
 You can use Composer to create new projects from an existing package. This is
@@ -481,9 +546,11 @@ By default the command checks for the packages on packagist.org.
 
 ### Options
 
-* **--repository-url:** Provide a custom repository to search for the package,
+* **--repository:** Provide a custom repository to search for the package,
   which will be used instead of packagist. Can be either an HTTP URL pointing
-  to a `composer` repository, or a path to a local `packages.json` file.
+  to a `composer` repository, a path to a local `packages.json` file, or a
+  JSON string which similar to what the [repositories](04-schema.md#repositories)
+  key accepts.
 * **--stability (-s):** Minimum stability of package. Defaults to `stable`.
 * **--prefer-source:** Install packages from `source` when available.
 * **--prefer-dist:** Install packages from `dist` when available.
@@ -541,11 +608,22 @@ Lists the name, version and license of every package installed. Use
 
 ### Options
 
+* **--timeout:** Set the script timeout in seconds, or 0 for no timeout.
 * **--no-dev:** Disable dev mode
 * **--list:** List user defined scripts
 
 To run [scripts](articles/scripts.md) manually you can use this command,
 just give it the script name and optionally any required arguments.
+
+## exec
+
+Executes a vendored binary/script. You can execute any command and this will
+ensure that the Composer bin-dir is pushed on your PATH before the command
+runs.
+
+### Options
+
+* **--list:** List the available composer binaries
 
 ## diagnose
 
@@ -580,6 +658,11 @@ To get more information about a certain command, just use `help`.
 ```sh
 php composer.phar help install
 ```
+
+## Command-line completion
+
+Command-line completion can be enabled by following instructions
+[on this page](https://github.com/bamarni/symfony-console-autocomplete).
 
 ## Environment variables
 
@@ -655,9 +738,11 @@ The `COMPOSER_HOME` var allows you to change the Composer home directory. This
 is a hidden, global (per-user on the machine) directory that is shared between
 all projects.
 
-By default it points to `/home/<user>/.composer` on \*nix,
-`/Users/<user>/.composer` on OSX and
-`C:\Users\<user>\AppData\Roaming\Composer` on Windows.
+By default it points to `C:\Users\<user>\AppData\Roaming\Composer` on Windows
+and `/Users/<user>/.composer` on OSX. On *nix systems that follow the [XDG Base
+Directory Specifications](http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html),
+it points to `$XDG_CONFIG_HOME/composer`. On other *nix systems, it points to
+`/home/<user>/.composer`.
 
 #### COMPOSER_HOME/config.json
 
@@ -684,6 +769,18 @@ By default it points to $COMPOSER_HOME/cache on \*nix and OSX, and
 This env var controls the time Composer waits for commands (such as git
 commands) to finish executing. The default value is 300 seconds (5 minutes).
 
+### COMPOSER_CAFILE
+
+By setting this environmental value, you can set a path to a certificate bundle
+file to be used during SSL/TLS peer verification.
+
+### COMPOSER_AUTH
+
+The `COMPOSER_AUTH` var allows you to set up authentication as an environment variable.
+The contents of the variable should be a JSON formatted object containing http-basic,
+github-oauth, bitbucket-oauth, ... objects as needed, and following the
+[spec from the config](06-config.md#gitlab-oauth).
+
 ### COMPOSER_DISCARD_CHANGES
 
 This env var controls the [`discard-changes`](06-config.md#discard-changes) config option.
@@ -692,5 +789,15 @@ This env var controls the [`discard-changes`](06-config.md#discard-changes) conf
 
 If set to 1, this env var will make Composer behave as if you passed the
 `--no-interaction` flag to every command. This can be set on build boxes/CI.
+
+### COMPOSER_DISABLE_XDEBUG_WARN
+
+If set to 1, this env disables the warning about having xdebug enabled.
+
+### COMPOSER_ALLOW_SUPERUSER
+
+If set to 1, this env disables the warning about running commands as root/super user.
+It also disables automatic clearing of sudo sessions, so you should really only set this
+if you use Composer as super user at all times like in docker containers.
 
 &larr; [Libraries](02-libraries.md)  |  [Schema](04-schema.md) &rarr;

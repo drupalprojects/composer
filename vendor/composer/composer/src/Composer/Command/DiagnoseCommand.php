@@ -14,6 +14,7 @@ namespace Composer\Command;
 
 use Composer\Composer;
 use Composer\Factory;
+use Composer\Config;
 use Composer\Downloader\TransportException;
 use Composer\Plugin\CommandEvent;
 use Composer\Plugin\PluginEvents;
@@ -21,13 +22,15 @@ use Composer\Util\ConfigValidator;
 use Composer\Util\ProcessExecutor;
 use Composer\Util\RemoteFilesystem;
 use Composer\Util\StreamContextFactory;
+use Composer\SelfUpdate\Keys;
+use Composer\SelfUpdate\Versions;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
-class DiagnoseCommand extends Command
+class DiagnoseCommand extends BaseCommand
 {
     /** @var RemoteFileSystem */
     protected $rfs;
@@ -73,7 +76,9 @@ EOT
             $config = Factory::createConfig();
         }
 
-        $this->rfs = new RemoteFilesystem($io, $config);
+        $config->merge(array('config' => array('secure-http' => false)));
+
+        $this->rfs = Factory::createRemoteFilesystem($io, $config);
         $this->process = new ProcessExecutor($io);
 
         $io->write('Checking platform settings: ', false);
@@ -83,10 +88,10 @@ EOT
         $this->outputResult($this->checkGit());
 
         $io->write('Checking http connectivity to packagist: ', false);
-        $this->outputResult($this->checkHttp('http'));
+        $this->outputResult($this->checkHttp('http', $config));
 
         $io->write('Checking https connectivity to packagist: ', false);
-        $this->outputResult($this->checkHttp('https'));
+        $this->outputResult($this->checkHttp('https', $config));
 
         $opts = stream_context_get_options(StreamContextFactory::getContext('http://example.org'));
         if (!empty($opts['http']['proxy'])) {
@@ -132,8 +137,13 @@ EOT
         $io->write('Checking disk free space: ', false);
         $this->outputResult($this->checkDiskSpace($config));
 
-        $io->write('Checking composer version: ', false);
-        $this->outputResult($this->checkVersion());
+        if ('phar:' === substr(__FILE__, 0, 5)) {
+            $io->write('Checking pubkeys: ', false);
+            $this->outputResult($this->checkPubKeys($config));
+
+            $io->write('Checking composer version: ', false);
+            $this->outputResult($this->checkVersion($config));
+        }
 
         return $this->failures;
     }
@@ -141,11 +151,11 @@ EOT
     private function checkComposerSchema()
     {
         $validator = new ConfigValidator($this->getIO());
-        list($errors, $publishErrors, $warnings) = $validator->validate(Factory::getComposerFile());
+        list($errors, , $warnings) = $validator->validate(Factory::getComposerFile());
 
-        if ($errors || $publishErrors || $warnings) {
+        if ($errors || $warnings) {
             $messages = array(
-                'error' => array_merge($errors, $publishErrors),
+                'error' => $errors,
                 'warning' => $warnings,
             );
 
@@ -172,12 +182,32 @@ EOT
         return true;
     }
 
-    private function checkHttp($proto)
+    private function checkHttp($proto, Config $config)
     {
+        $disableTls = false;
+        $result = array();
+        if ($proto === 'https' && $config->get('disable-tls') === true) {
+            $disableTls = true;
+            $result[] = '<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>';
+        }
+        if ($proto === 'https' && !extension_loaded('openssl') && !$disableTls) {
+            $result[] = '<error>Composer is configured to use SSL/TLS protection but the openssl extension is not available.</error>';
+        }
+
         try {
             $this->rfs->getContents('packagist.org', $proto . '://packagist.org/packages.json', false);
-        } catch (\Exception $e) {
-            return $e;
+        } catch (TransportException $e) {
+            if (false !== strpos($e->getMessage(), 'cafile')) {
+                $result[] = '<error>[' . get_class($e) . '] ' . $e->getMessage() . '</error>';
+                $result[] = '<error>Unable to locate a valid CA certificate file. You must set a valid \'cafile\' option.</error>';
+                $result[] = '<error>You can alternatively disable this error, at your own risk, by enabling the \'disable-tls\' option.</error>';
+            } else {
+                array_unshift($result, '[' . get_class($e) . '] ' . $e->getMessage());
+            }
+        }
+
+        if (count($result) > 0) {
+            return $result;
         }
 
         return true;
@@ -261,7 +291,7 @@ EOT
     {
         $this->getIO()->setAuthentication($domain, $token, 'x-oauth-basic');
         try {
-            $url = $domain === 'github.com' ? 'https://api.'.$domain.'/user/repos' : 'https://'.$domain.'/api/v3/user/repos';
+            $url = $domain === 'github.com' ? 'https://api.'.$domain.'/' : 'https://'.$domain.'/api/v3/';
 
             return $this->rfs->getContents($domain, $url, false, array(
                 'retry-auth-failure' => false,
@@ -306,13 +336,42 @@ EOT
         return true;
     }
 
-    private function checkVersion()
+    private function checkPubKeys($config)
     {
-        $protocol = extension_loaded('openssl') ? 'https' : 'http';
-        $latest = trim($this->rfs->getContents('getcomposer.org', $protocol . '://getcomposer.org/version', false));
+        $home = $config->get('home');
+        $errors = array();
+        $io = $this->getIO();
 
-        if (Composer::VERSION !== $latest && Composer::VERSION !== '@package_version@') {
-            return '<comment>You are not running the latest version</comment>';
+        if (file_exists($home.'/keys.tags.pub') && file_exists($home.'/keys.dev.pub')) {
+            $io->write('');
+        }
+
+        if (file_exists($home.'/keys.tags.pub')) {
+            $io->write('Tags Public Key Fingerprint: ' . Keys::fingerprint($home.'/keys.tags.pub'));
+        } else {
+            $errors[] = '<error>Missing pubkey for tags verification</error>';
+        }
+
+        if (file_exists($home.'/keys.dev.pub')) {
+            $io->write('Dev Public Key Fingerprint: ' . Keys::fingerprint($home.'/keys.dev.pub'));
+        } else {
+            $errors[] = '<error>Missing pubkey for dev verification</error>';
+        }
+
+        if ($errors) {
+            $errors[] = '<error>Run composer self-update --update-keys to set them up</error>';
+        }
+
+        return $errors ?: true;
+    }
+
+    private function checkVersion($config)
+    {
+        $versionsUtil = new Versions($config, $this->rfs);
+        $latest = $versionsUtil->getLatest();
+
+        if (Composer::VERSION !== $latest['version'] && Composer::VERSION !== '@package_version@') {
+            return '<comment>You are not running the latest '.$versionsUtil->getChannel().' version, run `composer self-update` to update ('.Composer::VERSION.' => '.$latest['version'].')</comment>';
         }
 
         return true;
@@ -332,7 +391,13 @@ EOT
             if ($result instanceof \Exception) {
                 $io->write('['.get_class($result).'] '.$result->getMessage());
             } elseif ($result) {
-                $io->write(trim($result));
+                if (is_array($result)) {
+                    foreach ($result as $message) {
+                        $io->write($message);
+                    }
+                } else {
+                    $io->write($result);
+                }
             }
         }
     }
@@ -373,6 +438,10 @@ EOT
             $errors['hash'] = true;
         }
 
+        if (!extension_loaded('iconv') && !extension_loaded('mbstring')) {
+            $errors['iconv_mbstring'] = true;
+        }
+
         if (!ini_get('allow_url_fopen')) {
             $errors['allow_url_fopen'] = true;
         }
@@ -391,6 +460,10 @@ EOT
 
         if (!extension_loaded('openssl')) {
             $errors['openssl'] = true;
+        }
+
+        if (extension_loaded('openssl') && OPENSSL_VERSION_NUMBER < 0x1000100f) {
+            $warnings['openssl_version'] = true;
         }
 
         if (!defined('HHVM_VERSION') && !extension_loaded('apcu') && ini_get('apc.enable_cli')) {
@@ -439,6 +512,11 @@ EOT
                     case 'hash':
                         $text = PHP_EOL."The hash extension is missing.".PHP_EOL;
                         $text .= "Install it or recompile php without --disable-hash";
+                        break;
+
+                    case 'iconv_mbstring':
+                        $text = PHP_EOL."The iconv OR mbstring extension is required and both are missing.".PHP_EOL;
+                        $text .= "Install either of them or recompile php without --disable-iconv";
                         break;
 
                     case 'unicode':
@@ -508,6 +586,15 @@ EOT
                     case 'php':
                         $text  = "Your PHP ({$current}) is quite old, upgrading to PHP 5.3.4 or higher is recommended.".PHP_EOL;
                         $text .= " Composer works with 5.3.2+ for most people, but there might be edge case issues.";
+                        break;
+
+                    case 'openssl_version':
+                        // Attempt to parse version number out, fallback to whole string value.
+                        $opensslVersion = strstr(trim(strstr(OPENSSL_VERSION_TEXT, ' ')), ' ', true);
+                        $opensslVersion = $opensslVersion ?: OPENSSL_VERSION_TEXT;
+
+                        $text = "The OpenSSL library ({$opensslVersion}) used by PHP does not support TLSv1.2 or TLSv1.1.".PHP_EOL;
+                        $text .= "If possible you should upgrade OpenSSL to version 1.0.1 or above.";
                         break;
 
                     case 'xdebug_loaded':

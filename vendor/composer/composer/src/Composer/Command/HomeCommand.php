@@ -12,10 +12,11 @@
 
 namespace Composer\Command;
 
-use Composer\Factory;
 use Composer\Package\CompletePackageInterface;
 use Composer\Repository\RepositoryInterface;
 use Composer\Repository\ArrayRepository;
+use Composer\Repository\RepositoryFactory;
+use Composer\Util\Platform;
 use Composer\Util\ProcessExecutor;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
@@ -25,7 +26,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * @author Robert Schönthal <seroscho@googlemail.com>
  */
-class HomeCommand extends Command
+class HomeCommand extends BaseCommand
 {
     /**
      * {@inheritDoc}
@@ -117,7 +118,7 @@ EOT
     {
         $url = ProcessExecutor::escape($url);
 
-        if (defined('PHP_WINDOWS_VERSION_MAJOR')) {
+        if (Platform::isWindows()) {
             return passthru('start "web" explorer "' . $url . '"');
         }
 
@@ -152,8 +153,6 @@ EOT
             );
         }
 
-        $defaultRepos = Factory::createDefaultRepositories($this->getIO());
-
-        return $defaultRepos;
+        return RepositoryFactory::defaultRepos($this->getIO());
     }
 }

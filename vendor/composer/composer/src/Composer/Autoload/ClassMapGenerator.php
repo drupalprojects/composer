@@ -20,6 +20,7 @@ namespace Composer\Autoload;
 
 use Symfony\Component\Finder\Finder;
 use Composer\IO\IOInterface;
+use Composer\Util\Filesystem;
 
 /**
  * ClassMapGenerator
@@ -73,12 +74,18 @@ class ClassMapGenerator
         }
 
         $map = array();
+        $filesystem = new Filesystem();
+        $cwd = getcwd();
 
         foreach ($path as $file) {
-            $filePath = $file->getRealPath();
-
+            $filePath = $file->getPathname();
             if (!in_array(pathinfo($filePath, PATHINFO_EXTENSION), array('php', 'inc', 'hh'))) {
                 continue;
+            }
+
+            if (!$filesystem->isAbsolutePath($filePath)) {
+                $filePath = $cwd . '/' . $filePath;
+                $filePath = $filesystem->normalizePath($filePath);
             }
 
             if ($blacklist && preg_match($blacklist, strtr($filePath, '\\', '/'))) {
@@ -121,18 +128,25 @@ class ClassMapGenerator
             $extraTypes .= '|enum';
         }
 
-        try {
-            $contents = @php_strip_whitespace($path);
-            if (!$contents) {
-                if (!file_exists($path)) {
-                    throw new \Exception('File does not exist');
-                }
-                if (!is_readable($path)) {
-                    throw new \Exception('File is not readable');
-                }
+        // Use @ here instead of Silencer to actively suppress 'unhelpful' output
+        // @link https://github.com/composer/composer/pull/4886
+        $contents = @php_strip_whitespace($path);
+        if (!$contents) {
+            if (!file_exists($path)) {
+                $message = 'File at "%s" does not exist, check your classmap definitions';
+            } elseif (!is_readable($path)) {
+                $message = 'File at "%s" is not readable, check its permissions';
+            } elseif ('' === trim(file_get_contents($path))) {
+                // The input file was really empty and thus contains no classes
+                return array();
+            } else {
+                $message = 'File at "%s" could not be parsed as PHP, it may be binary or corrupted';
             }
-        } catch (\Exception $e) {
-            throw new \RuntimeException('Could not scan for classes inside '.$path.": \n".$e->getMessage(), 0, $e);
+            $error = error_get_last();
+            if (isset($error['message'])) {
+                $message .= PHP_EOL . 'The following message may be helpful:' . PHP_EOL . $error['message'];
+            }
+            throw new \RuntimeException(sprintf($message, $path));
         }
 
         // return early if there is no chance of matching anything in this file

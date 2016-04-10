@@ -13,6 +13,7 @@
 namespace Composer\Test;
 
 use Composer\Config;
+use Composer\Downloader\TransportException;
 
 class ConfigTest extends \PHPUnit_Framework_TestCase
 {
@@ -112,6 +113,27 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
         return $data;
     }
 
+    public function testPreferredInstallAsString()
+    {
+        $config = new Config(false);
+        $config->merge(array('config' => array('preferred-install' => 'source')));
+        $config->merge(array('config' => array('preferred-install' => 'dist')));
+
+        $this->assertEquals('dist', $config->get('preferred-install'));
+    }
+
+    public function testMergePreferredInstall()
+    {
+        $config = new Config(false);
+        $config->merge(array('config' => array('preferred-install' => 'dist')));
+        $config->merge(array('config' => array('preferred-install' => array('foo/*' => 'source'))));
+
+        // This assertion needs to make sure full wildcard preferences are placed last
+        // Handled by composer because we convert string preferences for BC, all other
+        // care for ordering and collision prevention is up to the user
+        $this->assertEquals(array('foo/*' => 'source', '*' => 'dist'), $config->get('preferred-install'));
+    }
+
     public function testMergeGithubOauth()
     {
         $config = new Config(false);
@@ -148,6 +170,16 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('/baz', $config->get('cache-dir'));
     }
 
+    public function testStreamWrapperDirs()
+    {
+        $config = new Config(false, '/foo/bar');
+        $config->merge(array('config' => array(
+            'cache-dir' => 's3://baz/',
+        )));
+
+        $this->assertEquals('s3://baz', $config->get('cache-dir'));
+    }
+
     public function testFetchingRelativePaths()
     {
         $config = new Config(false, '/foo/bar');
@@ -165,9 +197,95 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
     public function testOverrideGithubProtocols()
     {
         $config = new Config(false);
-        $config->merge(array('config' => array('github-protocols' => array('https', 'git'))));
+        $config->merge(array('config' => array('github-protocols' => array('https', 'ssh'))));
         $config->merge(array('config' => array('github-protocols' => array('https'))));
 
         $this->assertEquals(array('https'), $config->get('github-protocols'));
+    }
+
+    public function testGitDisabledByDefaultInGithubProtocols()
+    {
+        $config = new Config(false);
+        $config->merge(array('config' => array('github-protocols' => array('https', 'git'))));
+        $this->assertEquals(array('https'), $config->get('github-protocols'));
+
+        $config->merge(array('config' => array('secure-http' => false)));
+        $this->assertEquals(array('https', 'git'), $config->get('github-protocols'));
+    }
+
+    /**
+     * @dataProvider allowedUrlProvider
+     *
+     * @param string $url
+     */
+    public function testAllowedUrlsPass($url)
+    {
+        $config = new Config(false);
+        $config->prohibitUrlByConfig($url);
+    }
+
+    /**
+     * @dataProvider prohibitedUrlProvider
+     *
+     * @param string $url
+     */
+    public function testProhibitedUrlsThrowException($url)
+    {
+        $this->setExpectedException(
+            'Composer\Downloader\TransportException',
+            'Your configuration does not allow connections to ' . $url
+        );
+        $config = new Config(false);
+        $config->prohibitUrlByConfig($url);
+    }
+
+    /**
+     * @return array List of test URLs that should pass strict security
+     */
+    public function allowedUrlProvider()
+    {
+        $urls = array(
+            'https://packagist.org',
+            'git@github.com:composer/composer.git',
+            'hg://user:pass@my.satis/satis',
+            '\\myserver\myplace.git',
+            'file://myserver.localhost/mygit.git',
+            'file://example.org/mygit.git',
+        );
+        return array_combine($urls, array_map(function($e) { return array($e); }, $urls));
+    }
+
+    /**
+     * @return array List of test URLs that should not pass strict security
+     */
+    public function prohibitedUrlProvider()
+    {
+        $urls = array(
+            'http://packagist.org',
+            'http://10.1.0.1/satis',
+            'http://127.0.0.1/satis',
+            'svn://localhost/trunk',
+            'svn://will.not.resolve/trunk',
+            'svn://192.168.0.1/trunk',
+            'svn://1.2.3.4/trunk',
+            'git://5.6.7.8/git.git',
+        );
+        return array_combine($urls, array_map(function($e) { return array($e); }, $urls));
+    }
+    
+    /**
+     * @group TLS
+     */
+    public function testDisableTlsCanBeOverridden()
+    {
+        $config = new Config;
+        $config->merge(
+            array('config' => array('disable-tls' => 'false'))
+        );
+        $this->assertFalse($config->get('disable-tls'));
+        $config->merge(
+            array('config' => array('disable-tls' => 'true'))
+        );
+        $this->assertTrue($config->get('disable-tls'));
     }
 }

@@ -16,9 +16,8 @@ use Composer\Config;
 use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Composer\Package\Loader\ArrayLoader;
-use Composer\Package\Locker;
 use Composer\Package\Version\VersionGuesser;
-use Composer\Semver\VersionParser;
+use Composer\Package\Version\VersionParser;
 use Composer\Util\ProcessExecutor;
 
 /**
@@ -42,14 +41,21 @@ use Composer\Util\ProcessExecutor;
  *     {
  *         "type": "path",
  *         "url": "/absolute/path/to/several/packages/*"
- *     }
+ *     },
+ *     {
+ *         "type": "path",
+ *         "url": "../../relative/path/to/package/",
+ *         "options": {
+ *             "symlink": false
+ *         }
+ *     },
  * ]
  * @endcode
  *
  * @author Samuel Roze <samuel.roze@gmail.com>
  * @author Johann Reinke <johann.reinke@gmail.com>
  */
-class PathRepository extends ArrayRepository
+class PathRepository extends ArrayRepository implements ConfigurableRepositoryInterface
 {
     /**
      * @var ArrayLoader
@@ -67,9 +73,19 @@ class PathRepository extends ArrayRepository
     private $url;
 
     /**
+     * @var array
+     */
+    private $repoConfig;
+
+    /**
      * @var ProcessExecutor
      */
     private $process;
+
+    /**
+     * @var array
+     */
+    private $options;
 
     /**
      * Initializes path repository.
@@ -84,12 +100,19 @@ class PathRepository extends ArrayRepository
             throw new \RuntimeException('You must specify the `url` configuration for the path repository');
         }
 
-        $this->loader = new ArrayLoader();
+        $this->loader = new ArrayLoader(null, true);
         $this->url = $repoConfig['url'];
         $this->process = new ProcessExecutor($io);
         $this->versionGuesser = new VersionGuesser($config, $this->process, new VersionParser());
+        $this->repoConfig = $repoConfig;
+        $this->options = isset($repoConfig['options']) ? $repoConfig['options'] : array();
 
         parent::__construct();
+    }
+
+    public function getRepoConfig()
+    {
+        return $this->repoConfig;
     }
 
     /**
@@ -102,7 +125,7 @@ class PathRepository extends ArrayRepository
         parent::initialize();
 
         foreach ($this->getUrlMatches() as $url) {
-            $path = realpath($url) . '/';
+            $path = realpath($url) . DIRECTORY_SEPARATOR;
             $composerFilePath = $path.'composer.json';
 
             if (!file_exists($composerFilePath)) {
@@ -114,24 +137,21 @@ class PathRepository extends ArrayRepository
             $package['dist'] = array(
                 'type' => 'path',
                 'url' => $url,
-                'reference' => '',
+                'reference' => sha1($json . serialize($this->options)),
             );
+            $package['transport-options'] = $this->options;
 
             if (!isset($package['version'])) {
-                $package['version'] = $this->versionGuesser->guessVersion($package, $path) ?: 'dev-master';
-            }
-            if (is_dir($path.'/.git') && 0 === $this->process->execute('git log -n1 --pretty=%H', $output, $path)) {
-                $package['dist']['reference'] = trim($output);
-            } else {
-                $package['dist']['reference'] = Locker::getContentHash($json);
+                $versionData = $this->versionGuesser->guessVersion($package, $path);
+                $package['version'] = $versionData['version'] ?: 'dev-master';
             }
 
+            $output = '';
+            if (is_dir($path . DIRECTORY_SEPARATOR . '.git') && 0 === $this->process->execute('git log -n1 --pretty=%H', $output, $path)) {
+                $package['dist']['reference'] = trim($output);
+            }
             $package = $this->loader->load($package);
             $this->addPackage($package);
-        }
-
-        if (count($this->getPackages()) == 0) {
-            throw new \RuntimeException(sprintf('No `composer.json` file found in any path repository in "%s"', $this->url));
         }
     }
 
@@ -142,6 +162,9 @@ class PathRepository extends ArrayRepository
      */
     private function getUrlMatches()
     {
-        return glob($this->url, GLOB_MARK | GLOB_ONLYDIR);
+        // Ensure environment-specific path separators are normalized to URL separators
+        return array_map(function ($val) {
+            return str_replace(DIRECTORY_SEPARATOR, '/', $val);
+        }, glob($this->url, GLOB_MARK | GLOB_ONLYDIR));
     }
 }

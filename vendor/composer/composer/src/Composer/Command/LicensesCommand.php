@@ -25,7 +25,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * @author Benoît Merlet <benoit.merlet@gmail.com>
  */
-class LicensesCommand extends Command
+class LicensesCommand extends BaseCommand
 {
     protected function configure()
     {
@@ -88,6 +88,7 @@ EOT
                 break;
 
             case 'json':
+                $dependencies = array();
                 foreach ($packages as $package) {
                     $dependencies[$package->getPrettyName()] = array(
                         'version' => $package->getFullPrettyVersion(),

@@ -15,6 +15,7 @@ namespace Composer\Test;
 use Composer\Installer;
 use Composer\Console\Application;
 use Composer\Json\JsonFile;
+use Composer\Util\Filesystem;
 use Composer\Repository\ArrayRepository;
 use Composer\Repository\RepositoryManager;
 use Composer\Repository\InstalledArrayRepository;
@@ -26,11 +27,15 @@ use Composer\Test\Mock\InstalledFilesystemRepositoryMock;
 use Composer\Test\Mock\InstallationManagerMock;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\StreamOutput;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Composer\TestCase;
+use Composer\IO\BufferIO;
 
 class InstallerTest extends TestCase
 {
     protected $prevCwd;
+    protected $tempComposerHome;
 
     public function setUp()
     {
@@ -41,6 +46,10 @@ class InstallerTest extends TestCase
     public function tearDown()
     {
         chdir($this->prevCwd);
+        if (is_dir($this->tempComposerHome)) {
+            $fs = new Filesystem;
+            $fs->removeDirectory($this->tempComposerHome);
+        }
     }
 
     /**
@@ -137,7 +146,7 @@ class InstallerTest extends TestCase
     /**
      * @dataProvider getIntegrationTests
      */
-    public function testIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectOutput, $expect, $expectExitCode)
+    public function testIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectOutput, $expect, $expectResult)
     {
         if ($condition) {
             eval('$res = '.$condition.';');
@@ -146,19 +155,17 @@ class InstallerTest extends TestCase
             }
         }
 
-        $output = null;
-        $io = $this->getMock('Composer\IO\IOInterface');
-        $callback = function ($text, $newline) use (&$output) {
-            $output .= $text . ($newline ? "\n" : "");
-        };
-        $io->expects($this->any())
-            ->method('write')
-            ->will($this->returnCallback($callback));
-        $io->expects($this->any())
-            ->method('writeError')
-            ->will($this->returnCallback($callback));
+        $io = new BufferIO('', OutputInterface::VERBOSITY_NORMAL, new OutputFormatter(false));
 
+        // Prepare for exceptions
+        if (!is_int($expectResult)) {
+            $normalizedOutput = rtrim(str_replace("\n", PHP_EOL, $expect));
+            $this->setExpectedException($expectResult, $normalizedOutput);
+        }
+
+        // Create Composer mock object according to configuration
         $composer = FactoryMock::create($io, $composerConfig);
+        $this->tempComposerHome = $composer->getConfig()->get('home');
 
         $jsonMock = $this->getMockBuilder('Composer\Json\JsonFile')->disableOriginalConstructor()->getMock();
         $jsonMock->expects($this->any())
@@ -233,8 +240,14 @@ class InstallerTest extends TestCase
         $appOutput = fopen('php://memory', 'w+');
         $result = $application->run(new StringInput($run), new StreamOutput($appOutput));
         fseek($appOutput, 0);
-        $this->assertEquals($expectExitCode, $result, $output . stream_get_contents($appOutput));
 
+        // Shouldn't check output and results if an exception was expected by this point
+        if (!is_int($expectResult)) {
+            return;
+        }
+
+        $output = str_replace("\r", '', $io->getOutput());
+        $this->assertEquals($expectResult, $result, $output . stream_get_contents($appOutput));
         if ($expectLock) {
             unset($actualLock['hash']);
             unset($actualLock['content-hash']);
@@ -246,7 +259,7 @@ class InstallerTest extends TestCase
         $this->assertSame(rtrim($expect), implode("\n", $installationManager->getTrace()));
 
         if ($expectOutput) {
-            $this->assertEquals(rtrim($expectOutput), rtrim($output));
+            $this->assertStringMatchesFormat(rtrim($expectOutput), rtrim($output));
         }
     }
 
@@ -266,7 +279,7 @@ class InstallerTest extends TestCase
             $installedDev = array();
             $lock = array();
             $expectLock = array();
-            $expectExitCode = 0;
+            $expectResult = 0;
 
             try {
                 $message = $testData['TEST'];
@@ -303,12 +316,21 @@ class InstallerTest extends TestCase
                 }
                 $expectOutput = isset($testData['EXPECT-OUTPUT']) ? $testData['EXPECT-OUTPUT'] : null;
                 $expect = $testData['EXPECT'];
-                $expectExitCode = isset($testData['EXPECT-EXIT-CODE']) ? (int) $testData['EXPECT-EXIT-CODE'] : 0;
+                if (!empty($testData['EXPECT-EXCEPTION'])) {
+                    $expectResult = $testData['EXPECT-EXCEPTION'];
+                    if (!empty($testData['EXPECT-EXIT-CODE'])) {
+                        throw new \LogicException('EXPECT-EXCEPTION and EXPECT-EXIT-CODE are mutually exclusive');
+                    }
+                } elseif (!empty($testData['EXPECT-EXIT-CODE'])) {
+                    $expectResult = (int) $testData['EXPECT-EXIT-CODE'];
+                } else {
+                    $expectResult = 0;
+                }
             } catch (\Exception $e) {
                 die(sprintf('Test "%s" is not valid: '.$e->getMessage(), str_replace($fixturesDir.'/', '', $file)));
             }
 
-            $tests[basename($file)] = array(str_replace($fixturesDir.'/', '', $file), $message, $condition, $composer, $lock, $installed, $run, $expectLock, $expectOutput, $expect, $expectExitCode);
+            $tests[basename($file)] = array(str_replace($fixturesDir.'/', '', $file), $message, $condition, $composer, $lock, $installed, $run, $expectLock, $expectOutput, $expect, $expectResult);
         }
 
         return $tests;
@@ -328,6 +350,7 @@ class InstallerTest extends TestCase
             'EXPECT-LOCK' => false,
             'EXPECT-OUTPUT' => false,
             'EXPECT-EXIT-CODE' => false,
+            'EXPECT-EXCEPTION' => false,
             'EXPECT' => true,
         );
 

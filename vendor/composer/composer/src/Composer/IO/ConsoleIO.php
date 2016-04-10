@@ -33,6 +33,7 @@ class ConsoleIO extends BaseIO
     protected $lastMessage;
     protected $lastMessageErr;
     private $startTime;
+    private $verbosityMap;
 
     /**
      * Constructor.
@@ -46,6 +47,13 @@ class ConsoleIO extends BaseIO
         $this->input = $input;
         $this->output = $output;
         $this->helperSet = $helperSet;
+        $this->verbosityMap = array(
+            self::QUIET => OutputInterface::VERBOSITY_QUIET,
+            self::NORMAL => OutputInterface::VERBOSITY_NORMAL,
+            self::VERBOSE => OutputInterface::VERBOSITY_VERBOSE,
+            self::VERY_VERBOSE => OutputInterface::VERBOSITY_VERY_VERBOSE,
+            self::DEBUG => OutputInterface::VERBOSITY_DEBUG,
+        );
     }
 
     public function enableDebugging($startTime)
@@ -96,26 +104,39 @@ class ConsoleIO extends BaseIO
     /**
      * {@inheritDoc}
      */
-    public function write($messages, $newline = true)
+    public function write($messages, $newline = true, $verbosity = self::NORMAL)
     {
-        $this->doWrite($messages, $newline, false);
+        $this->doWrite($messages, $newline, false, $verbosity);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function writeError($messages, $newline = true)
+    public function writeError($messages, $newline = true, $verbosity = self::NORMAL)
     {
-        $this->doWrite($messages, $newline, true);
+        $this->doWrite($messages, $newline, true, $verbosity);
     }
 
     /**
-     * @param array $messages
-     * @param bool  $newline
-     * @param bool  $stderr
+     * @param array|string $messages
+     * @param bool         $newline
+     * @param bool         $stderr
+     * @param int          $verbosity
      */
-    private function doWrite($messages, $newline, $stderr)
+    private function doWrite($messages, $newline, $stderr, $verbosity)
     {
+        $sfVerbosity = $this->verbosityMap[$verbosity];
+        if ($sfVerbosity > $this->output->getVerbosity()) {
+            return;
+        }
+
+        // hack to keep our usage BC with symfony<2.8 versions
+        // this removes the quiet output but there is no way around it
+        // see https://github.com/composer/composer/pull/4913
+        if (OutputInterface::VERBOSITY_QUIET === 0) {
+            $sfVerbosity = OutputInterface::OUTPUT_NORMAL;
+        }
+
         if (null !== $this->startTime) {
             $memoryUsage = memory_get_usage() / 1024 / 1024;
             $timeSpent = microtime(true) - $this->startTime;
@@ -125,39 +146,40 @@ class ConsoleIO extends BaseIO
         }
 
         if (true === $stderr && $this->output instanceof ConsoleOutputInterface) {
-            $this->output->getErrorOutput()->write($messages, $newline);
+            $this->output->getErrorOutput()->write($messages, $newline, $sfVerbosity);
             $this->lastMessageErr = join($newline ? "\n" : '', (array) $messages);
 
             return;
         }
 
-        $this->output->write($messages, $newline);
+        $this->output->write($messages, $newline, $sfVerbosity);
         $this->lastMessage = join($newline ? "\n" : '', (array) $messages);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function overwrite($messages, $newline = true, $size = null)
+    public function overwrite($messages, $newline = true, $size = null, $verbosity = self::NORMAL)
     {
-        $this->doOverwrite($messages, $newline, $size, false);
+        $this->doOverwrite($messages, $newline, $size, false, $verbosity);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function overwriteError($messages, $newline = true, $size = null)
+    public function overwriteError($messages, $newline = true, $size = null, $verbosity = self::NORMAL)
     {
-        $this->doOverwrite($messages, $newline, $size, true);
+        $this->doOverwrite($messages, $newline, $size, true, $verbosity);
     }
 
     /**
-     * @param array $messages
-     * @param bool  $newline
-     * @param int   $size
-     * @param bool  $stderr
+     * @param array|string $messages
+     * @param bool         $newline
+     * @param int|null     $size
+     * @param bool         $stderr
+     * @param int          $verbosity
      */
-    private function doOverwrite($messages, $newline, $size, $stderr)
+    private function doOverwrite($messages, $newline, $size, $stderr, $verbosity)
     {
         // messages can be an array, let's convert it to string anyway
         $messages = join($newline ? "\n" : '', (array) $messages);
@@ -168,21 +190,21 @@ class ConsoleIO extends BaseIO
             $size = strlen(strip_tags($stderr ? $this->lastMessageErr : $this->lastMessage));
         }
         // ...let's fill its length with backspaces
-        $this->doWrite(str_repeat("\x08", $size), false, $stderr);
+        $this->doWrite(str_repeat("\x08", $size), false, $stderr, $verbosity);
 
         // write the new message
-        $this->doWrite($messages, false, $stderr);
+        $this->doWrite($messages, false, $stderr, $verbosity);
 
         $fill = $size - strlen(strip_tags($messages));
         if ($fill > 0) {
             // whitespace whatever has left
-            $this->doWrite(str_repeat(' ', $fill), false, $stderr);
+            $this->doWrite(str_repeat(' ', $fill), false, $stderr, $verbosity);
             // move the cursor back
-            $this->doWrite(str_repeat("\x08", $fill), false, $stderr);
+            $this->doWrite(str_repeat("\x08", $fill), false, $stderr, $verbosity);
         }
 
         if ($newline) {
-            $this->doWrite('', true, $stderr);
+            $this->doWrite('', true, $stderr, $verbosity);
         }
 
         if ($stderr) {
@@ -197,17 +219,11 @@ class ConsoleIO extends BaseIO
      */
     public function ask($question, $default = null)
     {
-        $output = $this->output;
-
-        if ($output instanceof ConsoleOutputInterface) {
-            $output = $output->getErrorOutput();
-        }
-
         /** @var \Symfony\Component\Console\Helper\QuestionHelper $helper */
         $helper = $this->helperSet->get('question');
         $question = new Question($question, $default);
 
-        return $helper->ask($this->input, $output, $question);
+        return $helper->ask($this->input, $this->getErrorOutput(), $question);
     }
 
     /**
@@ -215,17 +231,11 @@ class ConsoleIO extends BaseIO
      */
     public function askConfirmation($question, $default = true)
     {
-        $output = $this->output;
-
-        if ($output instanceof ConsoleOutputInterface) {
-            $output = $output->getErrorOutput();
-        }
-
         /** @var \Symfony\Component\Console\Helper\QuestionHelper $helper */
         $helper = $this->helperSet->get('question');
         $question = new ConfirmationQuestion($question, $default);
 
-        return $helper->ask($this->input, $output, $question);
+        return $helper->ask($this->input, $this->getErrorOutput(), $question);
     }
 
     /**
@@ -233,19 +243,13 @@ class ConsoleIO extends BaseIO
      */
     public function askAndValidate($question, $validator, $attempts = null, $default = null)
     {
-        $output = $this->output;
-
-        if ($output instanceof ConsoleOutputInterface) {
-            $output = $output->getErrorOutput();
-        }
-
         /** @var \Symfony\Component\Console\Helper\QuestionHelper $helper */
         $helper = $this->helperSet->get('question');
         $question = new Question($question, $default);
         $question->setValidator($validator);
         $question->setMaxAttempts($attempts);
 
-        return $helper->ask($this->input, $output, $question);
+        return $helper->ask($this->input, $this->getErrorOutput(), $question);
     }
 
     /**
@@ -256,5 +260,26 @@ class ConsoleIO extends BaseIO
         $this->writeError($question, false);
 
         return \Seld\CliPrompt\CliPrompt::hiddenPrompt(true);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function select($question, $choices, $default, $attempts = false, $errorMessage = 'Value "%s" is invalid', $multiselect = false)
+    {
+        if ($this->isInteractive()) {
+            return $this->helperSet->get('dialog')->select($this->getErrorOutput(), $question, $choices, $default, $attempts, $errorMessage, $multiselect);
+        }
+
+        return $default;
+    }
+
+    private function getErrorOutput()
+    {
+        if ($this->output instanceof ConsoleOutputInterface) {
+            return $this->output->getErrorOutput();
+        }
+
+        return $this->output;
     }
 }

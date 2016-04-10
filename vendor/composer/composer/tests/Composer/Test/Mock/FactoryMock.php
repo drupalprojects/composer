@@ -18,6 +18,7 @@ use Composer\Repository\RepositoryManager;
 use Composer\Repository\WritableRepositoryInterface;
 use Composer\Installer;
 use Composer\IO\IOInterface;
+use Composer\TestCase;
 
 class FactoryMock extends Factory
 {
@@ -26,14 +27,14 @@ class FactoryMock extends Factory
         $config = new Config(true, $cwd);
 
         $config->merge(array(
-            'config' => array('home' => sys_get_temp_dir().'/composer-test'),
+            'config' => array('home' => TestCase::getUniqueTmpDirectory()),
             'repositories' => array('packagist' => false),
         ));
 
         return $config;
     }
 
-    protected function addLocalRepository(RepositoryManager $rm, $vendorDir)
+    protected function addLocalRepository(IOInterface $io, RepositoryManager $rm, $vendorDir)
     {
     }
 

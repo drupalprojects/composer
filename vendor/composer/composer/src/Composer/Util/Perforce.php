@@ -51,10 +51,7 @@ class Perforce
 
     public static function create($repoConfig, $port, $path, ProcessExecutor $process, IOInterface $io)
     {
-        $isWindows = defined('PHP_WINDOWS_VERSION_BUILD');
-        $perforce = new Perforce($repoConfig, $port, $path, $process, $isWindows, $io);
-
-        return $perforce;
+        return new Perforce($repoConfig, $port, $path, $process, Platform::isWindows(), $io);
     }
 
     public static function checkServerExists($url, ProcessExecutor $processExecutor)
@@ -247,6 +244,8 @@ class Perforce
                     return $value;
                 }
             }
+
+            return null;
         } else {
             $command = 'echo $' . $name;
             $this->executeCommand($command);
@@ -519,18 +518,22 @@ class Perforce
         return false;
     }
 
+    /**
+     * @param $reference
+     * @return mixed|null
+     */
     protected function getChangeList($reference)
     {
         $index = strpos($reference, '@');
         if ($index === false) {
-            return;
+            return null;
         }
         $label = substr($reference, $index);
         $command = $this->generateP4Command(' changes -m1 ' . $label);
         $this->executeCommand($command);
         $changes = $this->commandResult;
         if (strpos($changes, 'Change') !== 0) {
-            return;
+            return null;
         }
         $fields = explode(' ', $changes);
         $changeList = $fields[1];
@@ -538,15 +541,20 @@ class Perforce
         return $changeList;
     }
 
+    /**
+     * @param $fromReference
+     * @param $toReference
+     * @return mixed|null
+     */
     public function getCommitLogs($fromReference, $toReference)
     {
         $fromChangeList = $this->getChangeList($fromReference);
         if ($fromChangeList == null) {
-            return;
+            return null;
         }
         $toChangeList = $this->getChangeList($toReference);
         if ($toChangeList == null) {
-            return;
+            return null;
         }
         $index = strpos($fromReference, '@');
         $main = substr($fromReference, 0, $index) . '/...';

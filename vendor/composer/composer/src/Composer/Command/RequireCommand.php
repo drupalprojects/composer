@@ -20,7 +20,7 @@ use Composer\Factory;
 use Composer\Installer;
 use Composer\Json\JsonFile;
 use Composer\Json\JsonManipulator;
-use Composer\Semver\VersionParser;
+use Composer\Package\Version\VersionParser;
 use Composer\Plugin\CommandEvent;
 use Composer\Plugin\PluginEvents;
 use Composer\Repository\CompositeRepository;
@@ -42,6 +42,7 @@ class RequireCommand extends InitCommand
                 new InputOption('dev', null, InputOption::VALUE_NONE, 'Add requirement to require-dev.'),
                 new InputOption('prefer-source', null, InputOption::VALUE_NONE, 'Forces installation from package sources when possible, including VCS information.'),
                 new InputOption('prefer-dist', null, InputOption::VALUE_NONE, 'Forces installation from package dist even for dev versions.'),
+                new InputOption('no-plugins', null, InputOption::VALUE_NONE, 'Disables all plugins.'),
                 new InputOption('no-progress', null, InputOption::VALUE_NONE, 'Do not output download progress.'),
                 new InputOption('no-update', null, InputOption::VALUE_NONE, 'Disables the automatic update of the dependencies.'),
                 new InputOption('update-no-dev', null, InputOption::VALUE_NONE, 'Run the dependency update with the --no-dev option.'),
@@ -93,7 +94,7 @@ EOT
         $composerDefinition = $json->read();
         $composerBackup = file_get_contents($json->getPath());
 
-        $composer = $this->getComposer();
+        $composer = $this->getComposer(true, $input->getOption('no-plugins'));
         $repos = $composer->getRepositoryManager()->getRepositories();
 
         $platformOverrides = $composer->getConfig()->get('platform') ?: array();
@@ -117,7 +118,7 @@ EOT
             $versionParser->parseConstraints($constraint);
         }
 
-        $sortPackages = $input->getOption('sort-packages');
+        $sortPackages = $input->getOption('sort-packages') || $composer->getConfig()->get('sort-packages');
 
         if (!$this->updateFileCleanly($json, $baseRequirements, $requirements, $requireKey, $removeKey, $sortPackages)) {
             foreach ($requirements as $package => $version) {
@@ -143,7 +144,7 @@ EOT
 
         // Update packages
         $this->resetComposer();
-        $composer = $this->getComposer();
+        $composer = $this->getComposer(true, $input->getOption('no-plugins'));
         $composer->getDownloadManager()->setOutputProgress(!$input->getOption('no-progress'));
 
         $commandEvent = new CommandEvent(PluginEvents::COMMAND, 'require', $input, $output);
@@ -164,7 +165,12 @@ EOT
             ->setIgnorePlatformRequirements($input->getOption('ignore-platform-reqs'))
         ;
 
-        $status = $install->run();
+        $exception = null;
+        try {
+            $status = $install->run();
+        } catch (\Exception $exception) {
+            $status = 1;
+        }
         if ($status !== 0) {
             if ($newlyCreated) {
                 $io->writeError("\n".'<error>Installation failed, deleting '.$file.'.</error>');
@@ -173,6 +179,9 @@ EOT
                 $io->writeError("\n".'<error>Installation failed, reverting '.$file.' to its original content.</error>');
                 file_put_contents($json->getPath(), $composerBackup);
             }
+        }
+        if ($exception) {
+            throw $exception;
         }
 
         return $status;

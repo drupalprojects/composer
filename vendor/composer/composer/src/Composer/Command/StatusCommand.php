@@ -19,12 +19,13 @@ use Composer\Downloader\ChangeReportInterface;
 use Composer\Plugin\CommandEvent;
 use Composer\Plugin\PluginEvents;
 use Composer\Script\ScriptEvents;
+use Composer\Downloader\DvcsDownloaderInterface;
 
 /**
  * @author Tiago Ribeiro <tiago.ribeiro@seegno.com>
  * @author Rui Marinho <rui.marinho@seegno.com>
  */
-class StatusCommand extends Command
+class StatusCommand extends BaseCommand
 {
     protected function configure()
     {
@@ -61,9 +62,10 @@ EOT
 
         $errors = array();
         $io = $this->getIO();
+        $unpushedChanges = array();
 
         // list packages
-        foreach ($installedRepo->getPackages() as $package) {
+        foreach ($installedRepo->getCanonicalPackages() as $package) {
             $downloader = $dm->getDownloaderForInstalledPackage($package);
 
             if ($downloader instanceof ChangeReportInterface) {
@@ -76,13 +78,19 @@ EOT
                 if ($changes = $downloader->getLocalChanges($package, $targetDir)) {
                     $errors[$targetDir] = $changes;
                 }
+
+                if ($downloader instanceof DvcsDownloaderInterface) {
+                    if ($unpushed = $downloader->getUnpushedChanges($package, $targetDir)) {
+                        $unpushedChanges[$targetDir] = $unpushed;
+                    }
+                }
             }
         }
 
         // output errors/warnings
-        if (!$errors) {
+        if (!$errors && !$unpushedChanges) {
             $io->writeError('<info>No local changes</info>');
-        } else {
+        } elseif ($errors) {
             $io->writeError('<error>You have changes in the following dependencies:</error>');
         }
 
@@ -98,13 +106,29 @@ EOT
             }
         }
 
-        if ($errors && !$input->getOption('verbose')) {
-            $io->writeError('Use --verbose (-v) to see modified files');
+        if ($unpushedChanges) {
+            $io->writeError('<warning>You have unpushed changes on the current branch in the following dependencies:</warning>');
+
+            foreach ($unpushedChanges as $path => $changes) {
+                if ($input->getOption('verbose')) {
+                    $indentedChanges = implode("\n", array_map(function ($line) {
+                        return '    ' . ltrim($line);
+                    }, explode("\n", $changes)));
+                    $io->write('<info>'.$path.'</info>:');
+                    $io->write($indentedChanges);
+                } else {
+                    $io->write($path);
+                }
+            }
+        }
+
+        if (($errors || $unpushedChanges) && !$input->getOption('verbose')) {
+            $io->writeError('Use --verbose (-v) to see a list of files');
         }
 
         // Dispatch post-status-command
         $composer->getEventDispatcher()->dispatchScript(ScriptEvents::POST_STATUS_CMD, true);
 
-        return $errors ? 1 : 0;
+        return ($errors ? 1 : 0) + ($unpushedChanges ? 2 : 0);
     }
 }
